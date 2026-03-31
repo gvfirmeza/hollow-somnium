@@ -2,16 +2,16 @@
 
 :root {
   --bg-color: #0b021a;
-  --hylics-blue: #323b9d;
+  --hylics-blue: #0f122d;
   --hylics-border-white: #e9e9e9;
   --hylics-border-dark: #111111;
-
+  
   --text-main: #fcfcfc;
   --text-highlight: #ffcc00;
-
+  
   --accent-primary: #ff5277;
   --accent-secondary: #ffad29;
-
+  
   --font-main: 'Tinos', 'Times New Roman', serif;
 
   --common: #c0c0c0;
@@ -42,7 +42,7 @@ body {
   background: var(--hylics-blue);
   border: 4px solid var(--hylics-border-white);
   border-radius: 8px;
-  box-shadow: inset 0 0 0 2px var(--hylics-border-dark), 0 0 0 2px var(--hylics-border-dark), 5px 5px 0px rgba(0, 0, 0, 0.8);
+  box-shadow: inset 0 0 0 2px var(--hylics-border-dark), 0 0 0 2px var(--hylics-border-dark), 5px 5px 0px rgba(0,0,0,0.8);
   color: var(--text-main);
   position: relative;
 }
@@ -58,54 +58,23 @@ body {
 
 /* Coin click animations */
 @keyframes float {
-  0% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-
-  100% {
-    transform: translateY(0px);
-  }
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
 }
 
 @keyframes pop {
-  0% {
-    transform: scale(1);
-    filter: invert(0);
-  }
-
-  50% {
-    transform: scale(0.9);
-    filter: invert(1);
-  }
-
-  100% {
-    transform: scale(1);
-    filter: invert(0);
-  }
+  0% { transform: scale(1); filter: invert(0); }
+  50% { transform: scale(0.9); filter: invert(1); }
+  100% { transform: scale(1); filter: invert(0); }
 }
 
 /* Animated flesh hand indicator poke — one-shot, triggered by key remount from shared tick */
 @keyframes handPoke {
-  0% {
-    transform: translateY(0) scale(1);
-  }
-
-  38% {
-    transform: translateY(-14px) scale(1.25);
-    filter: brightness(2.2);
-  }
-
-  68% {
-    transform: translateY(4px) scale(0.92);
-  }
-
-  100% {
-    transform: translateY(0) scale(1);
-  }
+  0%   { transform: translateY(0) scale(1); }
+  38%  { transform: translateY(-14px) scale(1.25); filter: brightness(2.2); }
+  68%  { transform: translateY(4px) scale(0.92); }
+  100% { transform: translateY(0) scale(1); }
 }
 
 .clicking {
@@ -114,17 +83,8 @@ body {
 
 /* Floating +Money animations */
 @keyframes floatUpFade {
-  0% {
-    opacity: 1;
-    transform: translateY(0);
-    filter: saturate(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(-70px);
-    filter: saturate(3);
-  }
+  0% { opacity: 1; transform: translateY(0); filter: saturate(1); }
+  100% { opacity: 0; transform: translateY(-70px); filter: saturate(3); }
 }
 
 .floating-number {
@@ -141,21 +101,9 @@ body {
 
 /* Pack opening explosion animation */
 @keyframes packExplode {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: scale(1.1) rotate(5deg);
-    opacity: 1;
-    filter: contrast(300%) invert(1);
-  }
-
-  100% {
-    transform: scale(0);
-    opacity: 0;
-  }
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1) rotate(5deg); opacity: 1; filter: contrast(300%) invert(1); }
+  100% { transform: scale(0); opacity: 0; }
 }
 
 .explode-animation {
@@ -197,19 +145,9 @@ body {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-color);
-  border-left: 2px solid var(--hylics-blue);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--hylics-border-white);
-  border: 2px solid var(--hylics-border-dark);
-}
+::-webkit-scrollbar { width: 12px; }
+::-webkit-scrollbar-track { background: var(--bg-color); border-left: 2px solid var(--hylics-blue); }
+::-webkit-scrollbar-thumb { background: var(--hylics-border-white); border: 2px solid var(--hylics-border-dark); }
 
 /* ============================================================
    WAVY AURA EFFECTS (for rare/epic/legendary/abomination cards)
@@ -222,10 +160,7 @@ body {
 .wavy-aura::before {
   content: "";
   position: absolute;
-  top: -6px;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
   border-radius: 12px;
   z-index: -1;
   pointer-events: none;
@@ -244,48 +179,19 @@ body {
 }
 
 @keyframes pulse-wave {
-  0% {
-    transform: scale(1);
-    opacity: 0.5;
-    filter: hue-rotate(0deg);
-  }
-
-  100% {
-    transform: scale(1.05);
-    opacity: 1;
-    filter: hue-rotate(40deg);
-  }
+  0% { transform: scale(1); opacity: 0.5; filter: hue-rotate(0deg); }
+  100% { transform: scale(1.05); opacity: 1; filter: hue-rotate(40deg); }
 }
 
 @keyframes pulse-wave-fast {
-  0% {
-    transform: scale(1);
-    opacity: 0.8;
-    filter: drop-shadow(0 0 5px white);
-  }
-
-  100% {
-    transform: scale(1.08);
-    opacity: 1;
-    filter: drop-shadow(0 0 20px orange);
-  }
+  0% { transform: scale(1); opacity: 0.8; filter: drop-shadow(0 0 5px white); }
+  100% { transform: scale(1.08); opacity: 1; filter: drop-shadow(0 0 20px orange); }
 }
 
 @keyframes abomination-throb {
-  0% {
-    box-shadow: 0 0 30px 12px #ff0000;
-    opacity: 1;
-  }
-
-  50% {
-    box-shadow: 0 0 15px 5px #660000;
-    opacity: 0.7;
-  }
-
-  100% {
-    box-shadow: 0 0 40px 18px #aa0044;
-    opacity: 1;
-  }
+  0% { box-shadow: 0 0 30px 12px #ff0000; opacity: 1; }
+  50% { box-shadow: 0 0 15px 5px #660000; opacity: 0.7; }
+  100% { box-shadow: 0 0 40px 18px #aa0044; opacity: 1; }
 }
 
 /* ============================================================
@@ -293,17 +199,9 @@ body {
    ============================================================ */
 
 @keyframes hitFlash {
-  0% {
-    opacity: 0;
-  }
-
-  15% {
-    opacity: 0.35;
-  }
-
-  100% {
-    opacity: 0;
-  }
+  0%   { opacity: 0; }
+  15%  { opacity: 0.35; }
+  100% { opacity: 0; }
 }
 
 .battle-hit-overlay {
@@ -313,8 +211,7 @@ body {
   mix-blend-mode: screen;
   pointer-events: none;
   border-radius: 2px;
-  animation: hitFlash 0.5s ease-out forwards;
-  /* forwards = stays at opacity:0 after end */
+  animation: hitFlash 0.5s ease-out forwards; /* forwards = stays at opacity:0 after end */
 }
 
 /* ============================================================
@@ -322,21 +219,9 @@ body {
    ============================================================ */
 
 @keyframes rebirthPulse {
-  0% {
-    box-shadow: 0 0 10px 2px red;
-    border-color: red;
-  }
-
-  50% {
-    box-shadow: 0 0 30px 10px darkred;
-    border-color: darkred;
-    filter: brightness(0.8);
-  }
-
-  100% {
-    box-shadow: 0 0 10px 2px red;
-    border-color: red;
-  }
+  0% { box-shadow: 0 0 10px 2px red; border-color: red; }
+  50% { box-shadow: 0 0 30px 10px darkred; border-color: darkred; filter: brightness(0.8); }
+  100% { box-shadow: 0 0 10px 2px red; border-color: red; }
 }
 
 .rebirth-btn {
@@ -368,18 +253,24 @@ body {
   opacity: 0;
   transform: scale(0.9);
 }
-
 .fade-enter-active {
   opacity: 1;
   transform: scale(1);
   transition: opacity 300ms ease-in, transform 300ms ease-in;
 }
-
 .fade-exit {
   opacity: 1;
 }
-
 .fade-exit-active {
   opacity: 0;
   transition: opacity 300ms ease-in;
+}
+
+/* ============================================================
+   PACK CARD HOVER EFFECTS
+   ============================================================ */
+
+.pack-card[data-affordable="true"]:hover img {
+  transform: scale(1.04) translateY(-4px);
+  filter: drop-shadow(0 12px 30px rgba(255,255,255,0.25)) brightness(1.1) !important;
 }
