@@ -67,7 +67,7 @@ export const ABOMINATIONS_DB = [
     lore: 'An overdose of pure energy. It vibrating so violently it phases through matter.'
   },
   {
-    id: 107, sourceId: 7, name: 'God-Goblet', rarity: 'Abomination', image: '/cards/h7.png', attack: 500, hp: 600, filter: 'contrast(150%) hue-rotate(45deg) drop-shadow(0 0 10px gold)',
+    id: 107, sourceId: 7, name: 'God-Goblet', rarity: 'Abomination', image: '/cards/h7.png', attack: 500, hp: 600, filter: 'contrast(150%) hue-rotate(45deg)',
     lore: 'It overflows endlessly. The liquid has solidified into psychic crystal.'
   }
 ];

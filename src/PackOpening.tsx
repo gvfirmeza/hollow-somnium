@@ -163,7 +163,7 @@ export const PackOpening: React.FC<PackOpeningProps> = ({ packType, onOpenComple
                         const opacity = isFadingOut ? 0 : 1;
 
                         return (
-                            <div key={c.uniqueInstanceId} style={{ position: 'relative', width: 260, height: 380 }}>
+                            <div key={c.uniqueInstanceId} style={{ position: 'relative', width: 'min(260px, 80vw)', height: 'min(380px, 60vh)' }}>
                                 {isNew && <div className="hylics-panel" style={newBadgeStyle}>NEW!</div>}
                                 <div 
                                     className={`hylics-panel card-reveal ${holoClass}`} 
@@ -231,7 +231,7 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const packStyle: React.CSSProperties = {
-    width: 320, height: 420,
+    width: 'min(320px, 90vw)', height: 'min(420px, 70vh)',
     display: 'flex', flexDirection: 'column',
     position: 'relative', overflow: 'hidden',
     transformOrigin: 'bottom right', transition: 'transform 0.1s ease-out'
@@ -269,7 +269,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 const imgStyle: React.CSSProperties = {
-    width: '100%', height: 220, objectFit: 'cover', border: '4px solid var(--hylics-border-dark)'
+    width: '100%', height: '60%', objectFit: 'cover', border: '4px solid var(--hylics-border-dark)'
 };
 
 const newBadgeStyle: React.CSSProperties = {
