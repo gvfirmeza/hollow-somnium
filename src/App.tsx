@@ -123,9 +123,21 @@ function App() {
   }, []);
 
   const resetCardRotate = useCallback(() => {
-      if (cardInspectRef.current) {
-          cardInspectRef.current.style.transform = 'rotateY(0deg) rotateX(0deg)';
-      }
+    if (cardInspectRef.current) {
+        cardInspectRef.current.style.transform = 'rotateY(0deg) rotateX(0deg)';
+    }
+  }, []);
+
+  // Responsive scaling for the clicker
+  const [orbitScale, setOrbitScale] = useState(1);
+  useEffect(() => {
+    const handleResize = () => {
+      const scale = Math.min(1, (window.innerWidth - 40) / ORBIT_CONTAINER);
+      setOrbitScale(scale);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Handle interaction sounds and global BGM
@@ -264,7 +276,7 @@ function App() {
   const InspectedCard = ALL_CARDS.find(c => c.id === inspectedCardId);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', position: 'relative', padding: 20 }} onClickCapture={tryInitAudio}>
+    <div className="main-layout" onClickCapture={tryInitAudio}>
       
       {/* Dev Menu - draggable */}
       {debugUnlocked && (
@@ -292,17 +304,17 @@ function App() {
       </div>
       )}
 
-      <header className="hylics-panel" style={headerStyle}>
-        <div style={{ padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h1 className="title" style={{ margin: 0, fontSize: '2.5rem', cursor: 'pointer', userSelect: 'none' }} onDoubleClick={() => setDebugUnlocked(!debugUnlocked)}>HOLLOW·SOMNIUM</h1>
-            <div className="hylics-panel" style={statsStyle}>
+      <header className="hylics-panel" style={{ marginBottom: 20 }}>
+        <div style={{ padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <h1 className="title" style={{ margin: 0, cursor: 'pointer', userSelect: 'none', textAlign: 'center' }} onDoubleClick={() => setDebugUnlocked(!debugUnlocked)}>HOLLOW·SOMNIUM</h1>
+            <div className="hylics-panel" style={{ padding: '8px 20px', fontSize: '1.4rem', fontWeight: 'bold', width: 'fit-content' }}>
                 FLESH: {state.money.toLocaleString()}
-                {state.soulFragments > 0 && <span style={{fontSize: '1rem', color: 'var(--accent-secondary)', display: 'block', textAlign: 'right'}}>Prestige Multi: x{(1 + state.soulFragments * 10)}</span>}
+                {state.soulFragments > 0 && <span style={{fontSize: '0.8rem', color: 'var(--accent-secondary)', display: 'block', textAlign: 'center'}}>Prestige Multiplier x{(1 + state.soulFragments * 10)}</span>}
             </div>
         </div>
       </header>
       
-      <nav style={navStyle}>
+      <nav className="nav-tabs">
         <button className={`btn`} style={activeTab === 'clicker' ? activeTabStyle : {}} onClick={() => changeTab('clicker')}>HARVEST</button>
         <button className={`btn`} style={activeTab === 'shop' ? activeTabStyle : {}} onClick={() => changeTab('shop')}>MERCHANT</button>
         <button className={`btn`} style={activeTab === 'binder' ? activeTabStyle : {}} onClick={() => changeTab('binder')}>
@@ -314,10 +326,10 @@ function App() {
         <button className={`btn`} style={activeTab === 'rebirth' ? { ...activeTabStyle, border: '2px solid red', color: 'red' } : { border: '2px solid var(--accent-primary)', color: 'white' }} onClick={() => changeTab('rebirth')}>REBIRTH</button>
       </nav>
 
-      <main className="hylics-panel" style={mainStyle}>
-        <div style={{ padding: '30px', overflowY: 'auto', height: '100%' }}>
+      <main className="hylics-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '15px', overflowY: 'auto', height: '100%', scrollbarWidth: 'thin' }}>
             {activeTab === 'clicker' && (
-            <div style={clickerLayout}>
+            <div className="clicker-layout">
                 <div style={coinContainer}>
                     <p style={{ fontFamily: 'monospace', opacity: 0.7, marginBottom: 12, color: 'var(--text-highlight)' }}>// EXTRACTING...</p>
 
@@ -329,6 +341,9 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        transform: `scale(${orbitScale})`,
+                        transformOrigin: 'center center',
+                        marginBottom: (orbitScale < 1) ? -(ORBIT_CONTAINER * (1 - orbitScale)) : 0
                     }}>
                         {/* The clickable coin */}
                         <div
@@ -351,61 +366,61 @@ function App() {
                         />
                     </div>
 
-                    <div style={{...coinInnerStyle, textShadow: '2px 2px 0 var(--hylics-border-dark)', fontSize: '3rem', marginTop: -10, zIndex: 10 }}>
+                    <div className="coin-inner" style={{ textShadow: '2px 2px 0 var(--hylics-border-dark)', fontSize: '3rem', zIndex: 10, textAlign: 'center', width: '100%' }}>
                         +{currentEvolution.value}
                     </div>
 
-                    <h2 style={{ marginTop: 12, textDecoration: 'underline', color: currentEvolution.color }}>{currentEvolution.name}</h2>
-                    <p style={{ marginTop: 8, fontSize: '1.1rem' }}>
+                    <h2 style={{ marginTop: 20, textDecoration: 'underline', color: currentEvolution.color, textAlign: 'center' }}>{currentEvolution.name}</h2>
+                    <p style={{ marginTop: 8, fontSize: '1rem', textAlign: 'center', opacity: 0.8, maxWidth: 300 }}>
                         {state.fingers > 0
                           ? <>{state.fingers}/{MAX_FINGERS} Flesh Hand{state.fingers !== 1 ? 's' : ''} &bull; clicking every {(intervalMs / 1000).toFixed(1)}s &bull; +{currentEvolution.value * state.fingers}/click</>  
                           : <>No hands yet &mdash; buy one in Upgrades</>}
                     </p>
                 </div>
                 
-                <div className="hylics-panel" style={upgradesPanel}>
-                    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 15 }}>
+                <div className="hylics-panel upgrades-panel">
+                    <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div style={upgradeSectionHeader}>ABILITIES / UPGRADES</div>
-                        <div className="hylics-panel" style={upgradeItem}>
+                        <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                                <SvgEye color="var(--epic)" />
+                                <SvgEye color="var(--epic)" size={32} />
                                 <div>
-                                    <h4>Transmutation</h4>
-                                    <p style={{ fontSize: '1rem', color: '#aaa' }}>Next: {nextEvolution?.name || 'Maxed'}</p>
+                                    <h4 style={{ fontSize: '1.1rem' }}>Transmutation</h4>
+                                    <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Next: {nextEvolution?.name || 'Maxed'}</p>
                                 </div>
                             </div>
                             {nextEvolution ? (
-                                <button className="btn btn-primary" onClick={buyEvolution} disabled={state.money < nextEvolution.cost}>
-                                    CONSUME ({nextEvolution.cost})
+                                <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buyEvolution} disabled={state.money < nextEvolution.cost}>
+                                    {nextEvolution.cost.toLocaleString()}
                                 </button>
                             ) : (
                                 <button className="btn" disabled>Maxed</button>
                             )}
                         </div>
 
-                        <div className="hylics-panel" style={upgradeItem}>
+                        <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                                <SvgFleshHand color="var(--accent-primary)" />
+                                <SvgFleshHand color="var(--accent-primary)" size={32} />
                                 <div>
-                                    <h4>Flesh Hand</h4>
-                                    <p style={{ fontSize: '1rem', color: '#aaa' }}>Owned: {state.fingers}/{MAX_FINGERS}</p>
+                                    <h4 style={{ fontSize: '1.1rem' }}>Flesh Hand</h4>
+                                    <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Owned: {state.fingers}/{MAX_FINGERS}</p>
                                 </div>
                             </div>
-                            <button className="btn btn-primary" onClick={buyFinger} disabled={state.money < 100 * Math.pow(2, state.fingers) || state.fingers >= MAX_FINGERS}>
-                                {state.fingers >= MAX_FINGERS ? 'MAXED' : `CONSUME (${100 * Math.pow(2, state.fingers)})`}
+                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buyFinger} disabled={state.money < 100 * Math.pow(2, state.fingers) || state.fingers >= MAX_FINGERS}>
+                                {state.fingers >= MAX_FINGERS ? 'MAXED' : (100 * Math.pow(2, state.fingers)).toLocaleString()}
                             </button>
                         </div>
 
-                        <div className="hylics-panel" style={upgradeItem}>
+                        <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                                <SvgCoffeeCup color="var(--accent-secondary)" />
+                                <SvgCoffeeCup color="var(--accent-secondary)" size={32} />
                                 <div>
-                                    <h4>Perma-Caff</h4>
-                                    <p style={{ fontSize: '1rem', color: '#aaa' }}>Level: {state.speedLevel}/5</p>
+                                    <h4 style={{ fontSize: '1.1rem' }}>Perma-Caff</h4>
+                                    <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Level: {state.speedLevel}/5</p>
                                 </div>
                             </div>
-                            <button className="btn btn-primary" onClick={buySpeed} disabled={state.speedLevel >= 5 || state.money < 500 * Math.pow(3, state.speedLevel)}>
-                                {state.speedLevel < 5 ? `CONSUME (${500 * Math.pow(3, state.speedLevel)})` : 'Maxed'}
+                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buySpeed} disabled={state.speedLevel >= 5 || state.money < 500 * Math.pow(3, state.speedLevel)}>
+                                {state.speedLevel < 5 ? (500 * Math.pow(3, state.speedLevel)).toLocaleString() : 'Maxed'}
                             </button>
                         </div>
                     </div>
@@ -414,7 +429,7 @@ function App() {
             )}
 
             {activeTab === 'shop' && (
-            <div style={shopLayout}>
+            <div className="shop-grid">
                 {PACKS.map(pack => (
                     <div key={pack.id} className="pack-card" data-affordable={state.money >= pack.price ? "true" : "false"} style={packCardStyle} onClick={() => buyPack(pack)} title={state.money < pack.price ? 'Not enough Flesh' : `Buy ${pack.name}`}>
                         <img
@@ -440,7 +455,7 @@ function App() {
             )}
 
             {activeTab === 'binder' && (
-            <div style={binderLayout}>
+            <div className="binder-grid">
                 {ALL_CARDS.map(card => {
                     const ownedCount = state.collection[card.id] || 0;
                     const isUnlocked = ownedCount > 0;
@@ -452,9 +467,9 @@ function App() {
 
                     return (
                         <div key={card.id} style={{ position: 'relative', width: 170, height: 260, cursor: isUnlocked ? 'pointer' : 'default' }} onClick={() => isUnlocked && setInspectedCardId(card.id)}>
-                            {state.newCards.includes(card.id) && <div className="hylics-panel" style={newBadgeStyle}>NEW</div>}
+                            {state.newCards.includes(card.id) && <div className="new-badge">NEW</div>}
                             
-                            <div className={`hylics-panel ${holoClass}`} style={{ ...binderCardStyle, width: '100%', height: '100%', padding: 10 }}>
+                            <div className={`hylics-panel binder-card ${holoClass}`} style={{ width: '100%', height: '100%', padding: 10 }}>
                                 {isUnlocked ? (
                                     <>
                                         <div style={{ position: 'absolute', top: 5, left: 5, background: 'black', padding: '2px 5px', zIndex: 5, border: '1px solid white' }}>x{ownedCount}</div>
@@ -463,7 +478,7 @@ function App() {
                                         <span style={{ fontSize: '0.8rem', color: 'var(--text-highlight)', textAlign: 'center' }}>[ ATK: {card.attack} | HP: {card.hp} ]</span>
                                     </>
                                 ) : (
-                                    <div style={lockedStyle}>
+                                    <div className="locked-overlay">
                                         <div style={{ fontSize: '3rem', color: 'var(--hylics-blue)', textShadow: '2px 2px 0 black' }}>?</div>
                                     </div>
                                 )}
@@ -478,7 +493,7 @@ function App() {
                 <div style={{ textAlign: 'center' }}>
                     <h2 style={{ marginBottom: 30 }}>THE ALCHEMICAL MELD</h2>
                     <p style={{ marginBottom: 40, color: '#aaa' }}>Sacrifice 3 identical weak minds to forge a profound Abomination.</p>
-                    <div style={shopLayout}>
+                    <div className="shop-grid">
                         {ABOMINATIONS_DB.map(abom => {
                             const ownedSource = state.collection[abom.sourceId] || 0;
                             const canMeld = ownedSource >= 3;
@@ -522,8 +537,8 @@ function App() {
                             const isOwned = state.collection[chimera.id] > 0;
                             
                             return (
-                                <div key={chimera.id} className="hylics-panel" style={{ width: '100%', maxWidth: 700, padding: 25, border: `4px solid ${isOwned ? '#ff00ff' : '#555'}`, boxSizing: 'border-box' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
+                                <div key={chimera.id} className="hylics-panel fusion-card" style={{ border: `4px solid ${isOwned ? '#ff00ff' : '#555'}` }}>
+                                    <div className="fusion-row">
                                         {/* Cost side A */}
                                         <div style={{ textAlign: 'center', flex: 1, opacity: countA >= 1 ? 1 : 0.4 }}>
                                             <img src={srcA?.image} style={{ width: 80, height: 120, objectFit: 'cover', border: '3px solid black' }} />
@@ -575,13 +590,13 @@ function App() {
                     <h2 style={{ marginBottom: 20 }}>MIND COLOSSEUM</h2>
                     <p style={{ marginBottom: 40, color: '#aaa' }}>Assign creatures to harvest flesh continuously. (Attacks trigger every 2 seconds)</p>
                     
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 50 }}>
+                    <div className="battle-slots-container">
                         {battleSlots.map((slotId, idx) => {
                             const slotCard = slotId ? ALL_CARDS.find(c => c.id === slotId) : null;
                             const filterStyle = slotCard && (slotCard as any).filter ? { filter: (slotCard as any).filter } : {};
                             
                             return (
-                                <div key={idx} className="hylics-panel" style={{ width: 180, height: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 10, borderStyle: 'dashed' }}>
+                                <div key={idx} className="hylics-panel battle-slot">
                                     <div style={{ marginBottom: 10, color: 'var(--text-highlight)' }}>SLOT {idx + 1}</div>
                                     {slotCard ? (
                                         <>
@@ -657,7 +672,7 @@ function App() {
           <div style={modalOverlayStyle} onClick={() => setInspectedCardId(null)}>
               <div className="hylics-panel" style={inspectorPanelStyle} onClick={e => e.stopPropagation()}>
                   <button className="btn btn-primary" style={{ position: 'absolute', top: -5, right: -5, zIndex: 10, background: 'red' }} onClick={() => setInspectedCardId(null)}>X</button>
-                  <div style={{ display: 'flex', gap: 30, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <div className="inspector-content">
                       {/* 3D card with mouse-follow transform */}
                       <div className="card-3d-wrapper" onMouseMove={handle3DMove} onMouseLeave={resetCardRotate}>
                           <div className="card-3d-inner" ref={cardInspectRef}>
@@ -693,26 +708,13 @@ function App() {
 export default App;
 
 // Inline styles
-const headerStyle: React.CSSProperties = { marginBottom: 20, display: 'flex', flexDirection: 'column' };
-const statsStyle: React.CSSProperties = { padding: '10px 20px', fontSize: '1.5rem', fontWeight: 'bold' };
-const navStyle: React.CSSProperties = { display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' };
 const activeTabStyle: React.CSSProperties = { backgroundColor: 'var(--text-main)', color: 'var(--hylics-blue)' };
 const badgeStyle: React.CSSProperties = { background: 'var(--accent-primary)', color: 'white', padding: '2px 8px', fontSize: '0.9rem', marginLeft: 10, border: '2px solid black', borderRadius: 10 };
-const mainStyle: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' };
-const clickerLayout: React.CSSProperties = { display: 'flex', gap: 50, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap' };
-const coinContainer: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 350 };
+const coinContainer: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 320, paddingBottom: 20 };
 const coinStyle: React.CSSProperties = { width: 250, height: 250, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '8px solid var(--text-main)', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8), 0 10px 0 var(--hylics-border-dark)', transition: 'transform 0.1s', userSelect: 'none', position: 'relative' };
-const coinInnerStyle: React.CSSProperties = { fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-main)' };
-const upgradesPanel: React.CSSProperties = { width: 450, display: 'flex', flexDirection: 'column' };
 const upgradeSectionHeader: React.CSSProperties = { color: 'var(--text-highlight)', fontWeight: 'bold', fontSize: '1.4rem', borderBottom: '2px solid var(--hylics-border-white)', paddingBottom: 10, marginBottom: 5 };
-const upgradeItem: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 15 };
-const shopLayout: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 30, justifyContent: 'center' };
-const packCardStyle: React.CSSProperties = { width: 340, display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.15s ease' };
-const binderLayout: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 20, justifyContent: 'center' };
-const binderCardStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', overflow: 'hidden' };
-const lockedStyle: React.CSSProperties = { width: '100%', height: '100%', background: 'rgb(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--hylics-border-dark)' };
-const newBadgeStyle: React.CSSProperties = { position: 'absolute', top: -15, right: -15, background: 'var(--accent-primary)', color: 'white', fontWeight: 'bold', padding: '4px 8px', fontSize: '0.9rem', zIndex: 10, border: '2px solid var(--hylics-border-dark)' };
+const packCardStyle: React.CSSProperties = { width: 340, maxWidth: '100%', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.15s ease' };
 const devMenuStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999, width: 220, cursor: 'grab', touchAction: 'none' };
-const cardsGridStyle: React.CSSProperties = { display: 'flex', gap: 15, flexWrap: 'wrap', justifyContent: 'center' };
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 };
-const inspectorPanelStyle: React.CSSProperties = { width: '90%', maxWidth: 900, padding: 30, position: 'relative' };
+const inspectorPanelStyle: React.CSSProperties = { width: '90%', maxWidth: 900, padding: 20, position: 'relative', overflowY: 'auto', maxHeight: '95vh' };
+const cardsGridStyle: React.CSSProperties = { display: 'flex', gap: 15, flexWrap: 'wrap', justifyContent: 'center' };
