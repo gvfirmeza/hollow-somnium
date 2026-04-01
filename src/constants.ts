@@ -81,6 +81,10 @@ export const CHIMERAS_DB = [
   {
     id: 204, sourceIds: [4, 3], name: 'Stitch-Caff', rarity: 'Chimera', image: '/cards/stitch_caff.jpg', attack: 1200, hp: 2000,
     lore: 'The ultimate synthesis of flesh and energy. A stitched monstrosity fueled by infinite green sludge.'
+  },
+  {
+    id: 205, sourceIds: [1, 3], name: 'Moon-Torso', rarity: 'Chimera', image: '/cards/moon_torso.png', attack: 800, hp: 1200,
+    lore: 'A lunar eclipse of stitched flesh. It watches from the center of the world with a single, unblinking eye.'
   }
 ];
 

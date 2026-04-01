@@ -10,6 +10,7 @@ type GameState = {
   newCards: number[];
   prestigeLevel: number;
   soulFragments: number;
+  fusionHistory: { cardAId: number, cardBId: number, resultId: number | null, success: boolean, timestamp: number }[];
 };
 
 const DEFAULT_STATE: GameState = {
@@ -21,6 +22,7 @@ const DEFAULT_STATE: GameState = {
   newCards: [],
   prestigeLevel: 0,
   soulFragments: 0,
+  fusionHistory: [],
 };
 
 export function useGameState() {

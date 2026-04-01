@@ -507,3 +507,150 @@ body {
   }
 }
 
+/* Alchemical Altar & Ritual Animations */
+.altar-slot {
+  width: 140px;
+  height: 200px;
+  border: 4px dashed #444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  background: rgba(0,0,0,0.3);
+}
+
+.altar-slot.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 15px rgba(255,50,50,0.3);
+}
+
+.altar-slot:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.ritual-vortex {
+  animation: ritual-vortex-spin 1.5s infinite linear;
+}
+
+@keyframes ritual-vortex-spin {
+  0% { transform: rotate(0deg) scale(1); filter: hue-rotate(0deg) brightness(1); }
+  50% { transform: rotate(180deg) scale(1.1); filter: hue-rotate(90deg) brightness(1.5); }
+  100% { transform: rotate(360deg) scale(1); filter: hue-rotate(360deg) brightness(1); }
+}
+
+.ritual-shaking {
+  animation: ritual-shake 0.1s infinite;
+}
+
+@keyframes ritual-shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+/* Discovery Parchment */
+.parchment-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin: 40px auto;
+  overflow: hidden;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes packDropLeft {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  20% { transform: translate(-20px, -10px) rotate(-5deg); opacity: 1; }
+  100% { transform: translate(-100px, 100vh) rotate(-45deg); opacity: 0; }
+}
+
+@keyframes packDropRight {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  20% { transform: translate(20px, -10px) rotate(5deg); opacity: 1; }
+  100% { transform: translate(100px, 100vh) rotate(45deg); opacity: 0; }
+}
+
+/* Hide inspector scrollbars on desktop */
+.inspector-content {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow-y: auto;
+}
+.inspector-content::-webkit-scrollbar {
+  display: none;
+}
+
+.parchment-content {
+  background: #f4e4bc;
+  background-image: 
+    radial-gradient(circle at 50% 50%, transparent 80%, rgba(0,0,0,0.1) 100%),
+    url("https://www.transparenttextures.com/patterns/old-map.png");
+  color: #4a3728;
+  padding: 40px;
+  border-left: 15px solid #d2b48c;
+  border-right: 15px solid #d2b48c;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  font-family: 'Courier New', Courier, monospace;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 600px) {
+  .parchment-content {
+    padding: 20px 15px;
+    border-left-width: 8px;
+    border-right-width: 8px;
+  }
+}
+
+.parchment-reveal {
+  animation: unroll 0.8s forwards ease-out;
+  transform-origin: top;
+}
+
+@keyframes unroll {
+  from { max-height: 0; opacity: 0; transform: scaleY(0); }
+  to { max-height: 2000px; opacity: 1; transform: scaleY(1); }
+}
+
+.parchment-entry {
+  border-bottom: 1px dashed rgba(74, 55, 40, 0.3);
+  padding: 12px 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  font-weight: bold;
+}
+
+.parchment-entry.success { color: #2d5a27; }
+.parchment-entry.failure { color: #8b0000; opacity: 0.7; }
+
+/* Alchemy Elements */
+.failure-shiver {
+  animation: shiver 0.7s ease-out forwards;
+}
+
+@keyframes shiver {
+  0% { transform: scale(1); filter: grayscale(0); }
+  30% { transform: scale(1.2) rotate(10deg); filter: grayscale(0.5) brightness(2); }
+  100% { transform: scale(0) rotate(-20deg); filter: grayscale(1) opacity(0); }
+}
+
+.success-glow {
+  box-shadow: 0 0 30px #ffcc00;
+  animation: gold-pulse 1s infinite alternate;
+}
+
+@keyframes gold-pulse {
+  from { box-shadow: 0 0 10px #ffaa00; }
+  to { box-shadow: 0 0 40px #ffff00; }
+}
+
+
