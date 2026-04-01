@@ -121,33 +121,65 @@ export const PackOpening: React.FC<PackOpeningProps> = ({ packType, onOpenComple
   return (
     <div style={overlayStyle}>
       {!opened ? (
-        <>
-        <div className="hylics-panel" style={{ ...packStyle, transform: `rotate(${tiltAngle}deg)` }} ref={containerRef}>
-            <div style={{ padding: '30px 20px', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem' }}>{packType.name.toUpperCase()}</h2>
-                <p style={{ marginTop: 20, fontSize: '1rem', color: 'var(--text-highlight)' }}>SWIPE TAB TO RIP</p>
-            </div>
-            
-            <div style={tearStripBgStyle}>
-                <div 
-                    style={{ ...tearHandleStyle, left: `calc(${ripProgress}% - 25px)` }}
-                    onPointerDown={handleRipDown}
-                    onPointerMove={handleRipMove}
-                    onPointerUp={handleRipUp}
-                    onPointerCancel={handleRipUp}
-                >
-                    &gt;&gt;
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ ...packStyle, border: 'none', transform: `rotate(${tiltAngle}deg)` }} ref={containerRef}>
+                {/* Single Solid Pack Image */}
+                <div style={{ 
+                    ...packHalfBase, 
+                    backgroundImage: `url(${packType.image})`, 
+                    backgroundPosition: 'center',
+                    zIndex: 1
+                }} />
+                
+                {/* The Growing Crack Line */}
+                <div style={{ 
+                    position: 'absolute', top: '50%', left: 0, 
+                    width: `${ripProgress}%`, height: 8,
+                    background: '#000',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5)',
+                    zIndex: 2, pointerEvents: 'none',
+                    clipPath: 'polygon(0% 20%, 5% 80%, 10% 30%, 15% 70%, 20% 20%, 25% 90%, 30% 10%, 35% 80%, 40% 30%, 45% 70%, 50% 20%, 55% 90%, 60% 30%, 65% 70%, 70% 30%, 75% 90%, 80% 20%, 85% 70%, 90% 30%, 95% 80%, 100% 50%)',
+                    transition: 'width 0.1s ease-out'
+                }} />
+
+                {/* Rip Guide Arrow */}
+                <div style={{ ...tearStripBgStyle, backgroundColor: 'transparent', width: '100%', height: 100, top: '40%', left: 0, zIndex: 10 }}>
+                    <div 
+                        style={{ ...tearHandleStyle, left: `calc(${ripProgress}% - 40px)`, opacity: ripProgress > 5 ? 0 : 1, transition: 'opacity 0.3s', zIndex: 20 }}
+                        onPointerDown={handleRipDown}
+                        onPointerMove={handleRipMove}
+                        onPointerUp={handleRipUp}
+                        onPointerCancel={handleRipUp}
+                    >
+                        &gt;&gt;
+                    </div>
                 </div>
             </div>
             
+            <button className="btn" style={{ marginTop: 40, padding: '10px 30px', background: 'rgba(50,50,50,0.8)', color: 'white' }} onClick={handleSkip}>
+                FORCE EXTRACT &gt;&gt;
+            </button>
         </div>
-        <button className="btn" style={{ marginTop: 40, padding: '10px 30px', background: '#333', color: 'var(--text-highlight)' }} onClick={handleSkip}>
-            SKIP OPENING &gt;&gt;
-        </button>
-        </>
       ) : (
         <div style={revealContainerStyle}>
-            <h2 className="title explode-animation">REVEALED</h2>
+            {/* Final Drop Animation for Pack Fragments */}
+            {revealIndex === 0 && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 10, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="pack-drop-half" style={{ 
+                        width: 'min(320px, 90vw)', height: 'min(420px, 70vh)', 
+                        backgroundImage: `url(${packType.image})`, backgroundSize: 'cover',
+                        clipPath: `polygon(0% 0%, 100% 0%, 100% 50%, 75% 49%, 50% 51%, 25% 49%, 0% 50%)`, // Top Half
+                        animation: 'packDropLeft 1.2s forwards' 
+                    }} />
+                    <div className="pack-drop-half" style={{ 
+                        width: 'min(320px, 90vw)', height: 'min(420px, 70vh)', 
+                        backgroundImage: `url(${packType.image})`, backgroundSize: 'cover',
+                        clipPath: `polygon(0% 50%, 25% 49%, 50% 51%, 75% 49%, 100% 50%, 100% 100%, 0% 100%)`, // Bottom Half
+                        animation: 'packDropRight 1.2s forwards',
+                        position: 'absolute'
+                    }} />
+                </div>
+            )}
             
             {revealIndex < revealedCards.length ? (
                 // Show current card
@@ -230,17 +262,21 @@ const overlayStyle: React.CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
 };
 
+const packHalfBase: React.CSSProperties = {
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    backgroundSize: 'cover', backgroundPosition: 'center',
+    transition: 'transform 0.1s ease-out',
+};
+
 const packStyle: React.CSSProperties = {
     width: 'min(320px, 90vw)', height: 'min(420px, 70vh)',
     display: 'flex', flexDirection: 'column',
-    position: 'relative', overflow: 'hidden',
-    transformOrigin: 'bottom right', transition: 'transform 0.1s ease-out'
+    position: 'relative', overflow: 'visible', // Visible to allow separation
+    transformOrigin: 'center center', transition: 'transform 0.1s ease-out'
 };
 
 const tearStripBgStyle: React.CSSProperties = {
     position: 'absolute', top: 120, left: -10, right: -10, height: 50,
-    backgroundColor: '#000', borderTop: '4px solid var(--hylics-border-white)',
-    borderBottom: '4px solid var(--hylics-border-white)'
 };
 
 const tearHandleStyle: React.CSSProperties = {

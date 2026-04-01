@@ -98,6 +98,17 @@ function App() {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     e.stopPropagation();
   };
+
+  // Sync Colosseum slots with inventory (auto-remove if card is consumed)
+  useEffect(() => {
+    const isActuallyOwned = (id: number | null) => id !== null && (state.collection[id] || 0) > 0;
+    const hasGhostCards = battleSlots.some(slotId => slotId !== null && !isActuallyOwned(slotId));
+    
+    if (hasGhostCards) {
+        const cleanedSlots = battleSlots.map(slotId => isActuallyOwned(slotId) ? slotId : null);
+        setBattleSlots(cleanedSlots);
+    }
+  }, [state.collection, battleSlots]);
   const onDevPointerMove = (e: React.PointerEvent) => {
     if (!devDragStart.current) return;
     setDevPos({
@@ -139,6 +150,14 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Fusion Altar State
+  const [altarSlots, setAltarSlots] = useState<(number | null)[]>([null, null]);
+  const [isMerging, setIsMerging] = useState(false);
+  const [fusionResult, setFusionResult] = useState<{ id: number, success: boolean } | null>(null);
+  const [showParchment, setShowParchment] = useState(false);
+  const [parchmentFilter, setParchmentFilter] = useState<'all' | 'success' | 'failure'>('all');
+  const [showRoster, setShowRoster] = useState<number | null>(null); // slot index
 
   // Handle interaction sounds and global BGM
   const tryInitAudio = () => {
@@ -208,18 +227,6 @@ function App() {
       }
   };
 
-  const conductChimeraMelding = (chimera: any) => {
-      const [srcA, srcB] = chimera.sourceIds;
-      if (state.collection[srcA] >= 1 && state.collection[srcB] >= 1) {
-          tryInitAudio();
-          playMeld();
-          const newCol = { ...state.collection };
-          newCol[srcA] -= 1;
-          newCol[srcB] -= 1;
-          newCol[chimera.id] = (newCol[chimera.id] || 0) + 1;
-          updateState({ collection: newCol });
-      }
-  };
 
   const handleRebirth = () => {
       if (state.money >= 1000000) {
@@ -522,66 +529,172 @@ function App() {
                 </div>
             )}
 
-            {activeTab === 'fusions' && (
-                <div style={{ textAlign: 'center' }}>
-                    <h2 style={{ marginBottom: 30, color: '#ff00ff', textShadow: '2px 2px 0px black' }}>// CHIMERISATION PROTOCOL //</h2>
-                    <p style={{ opacity: 0.8, marginBottom: 40, color: '#aaa' }}>Merge two distinct esoteric forms to manifest a Chimera. You must possess at least 1 of each required entity.</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 30, alignItems: 'center' }}>
-                        {CHIMERAS_DB.map(chimera => {
-                            const [srcAId, srcBId] = chimera.sourceIds;
-                            const srcA = ALL_CARDS.find(c => c.id === srcAId);
-                            const srcB = ALL_CARDS.find(c => c.id === srcBId);
-                            const countA = state.collection[srcAId] || 0;
-                            const countB = state.collection[srcBId] || 0;
-                            const canMeld = countA >= 1 && countB >= 1;
-                            const isOwned = state.collection[chimera.id] > 0;
-                            
+             {activeTab === 'fusions' && (
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <h2 style={{ marginBottom: 10, color: 'var(--text-highlight)' }}>ALCHEMICAL ALTAR</h2>
+                    <p style={{ marginBottom: 30, color: '#aaa', textAlign: 'center', maxWidth: 500 }}>
+                        Combine two distinct essences. <br/>
+                        <span style={{ color: '#ff4444', fontWeight: 'bold' }}>WARNING: Ingredients are consumed regardless of the ritual's success.</span>
+                    </p>
+
+                    {/* Altar Slots */}
+                    <div style={{ display: 'flex', gap: 30, marginBottom: 40, perspective: '1000px' }}>
+                        {altarSlots.map((slotId, idx) => {
+                            const card = slotId ? ALL_CARDS.find(c => c.id === slotId) : null;
                             return (
-                                <div key={chimera.id} className="hylics-panel fusion-card" style={{ border: `4px solid ${isOwned ? '#ff00ff' : '#555'}` }}>
-                                    <div className="fusion-row">
-                                        {/* Cost side A */}
-                                        <div style={{ textAlign: 'center', flex: 1, opacity: countA >= 1 ? 1 : 0.4 }}>
-                                            <img src={srcA?.image} style={{ width: 80, height: 120, objectFit: 'cover', border: '3px solid black' }} />
-                                            <div style={{ color: countA >= 1 ? '#00ff00' : 'red', fontWeight: 'bold', marginTop: 10 }}>{countA} / 1</div>
+                                <div key={idx} 
+                                     className={`hylics-panel altar-slot ${isMerging ? 'ritual-shaking' : ''} ${slotId ? 'active' : ''}`}
+                                     onClick={() => !isMerging && setShowRoster(idx)}
+                                >
+                                    {card ? (
+                                        <div style={{ position: 'relative', width: '100%', height: '100%', padding: 5 }}>
+                                            <img src={card.image} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isMerging ? 0.6 : 1 }} />
+                                            <div style={{ position: 'absolute', bottom: 5, left: 0, right: 0, background: 'rgba(0,0,0,0.8)', fontSize: '0.7rem', padding: '2px 0', textAlign: 'center' }}>{card.name}</div>
+                                            {!isMerging && <div style={{ position: 'absolute', top: -10, right: -10, background: 'red', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid white' }} onClick={(e) => { e.stopPropagation(); setAltarSlots(s => { const n = [...s]; n[idx] = null; return n; }); }}>X</div>}
                                         </div>
-
-                                        <div style={{ fontSize: '3rem', color: '#ff00ff', fontWeight: 'bold' }}>+</div>
-
-                                        {/* Cost side B */}
-                                        <div style={{ textAlign: 'center', flex: 1, opacity: countB >= 1 ? 1 : 0.4 }}>
-                                            <img src={srcB?.image} style={{ width: 80, height: 120, objectFit: 'cover', border: '3px solid black' }} />
-                                            <div style={{ color: countB >= 1 ? '#00ff00' : 'red', fontWeight: 'bold', marginTop: 10 }}>{countB} / 1</div>
-                                        </div>
-
-                                        <div style={{ fontSize: '3rem', color: '#ff00ff', fontWeight: 'bold' }}>=</div>
-
-                                        {/* Result side */}
-                                        <div style={{ textAlign: 'center', flex: 2 }}>
-                                            <div className="wavy-aura" style={{ display: 'inline-block' }}>
-                                                {isOwned ? (
-                                                    <img src={chimera.image} style={{ width: 140, height: 210, objectFit: 'cover', border: '4px solid black', filter: chimera.filter }} />
-                                                ) : (
-                                                    <div style={{ width: 140, height: 210, background: '#111', border: '4px dashed #555', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <span style={{ fontSize: '4rem', color: '#333' }}>?</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <h3 style={{ marginTop: 15, color: isOwned ? '#ff00ff' : '#555', fontSize: '1.5rem', textShadow: '2px 2px 0 black' }}>{isOwned ? chimera.name : 'UNDISCOVERED'}</h3>
-                                            {isOwned && <p style={{ color: '#aaa', fontSize: '0.9rem', marginTop: 5 }}>Owned: {state.collection[chimera.id] || 0}</p>}
-                                        </div>
-                                    </div>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ marginTop: 25, width: '100%', padding: 15, fontSize: '1.2rem', background: canMeld ? '#111' : '#333', borderColor: canMeld ? '#ff00ff' : 'var(--hylics-border-white)' }}
-                                        disabled={!canMeld}
-                                        onClick={() => conductChimeraMelding(chimera)}
-                                    >
-                                        {canMeld ? (isOwned ? `FUSE ${chimera.name.toUpperCase()}` : 'FUSE UNKNOWN CHIMERA') : 'INSUFFICIENT MATERIALS'}
-                                    </button>
+                                    ) : (
+                                        <div style={{ fontSize: '3rem', opacity: 0.3 }}>+</div>
+                                    )}
                                 </div>
-                            )
+                            );
                         })}
                     </div>
+
+                    <button 
+                        className={`btn btn-primary ${isMerging ? 'ritual-vortex' : ''}`} 
+                        style={{ fontSize: '1.5rem', padding: '15px 40px', background: isMerging ? 'var(--accent-primary)' : 'black' }}
+                        disabled={altarSlots.some(s => s === null) || isMerging}
+                        onClick={async () => {
+                            setIsMerging(true);
+                            setFusionResult(null);
+                            
+                            // 1.5s Ritual Animation
+                            setTimeout(() => {
+                                const [idA, idB] = altarSlots;
+                                if (idA === null || idB === null) return;
+
+                                // Deduct cards
+                                const newCol = { ...state.collection };
+                                newCol[idA] = Math.max(0, newCol[idA] - 1);
+                                newCol[idB] = Math.max(0, newCol[idB] - 1);
+
+                                // Check recipe
+                                const recipe = CHIMERAS_DB.find(r => r.sourceIds.includes(idA) && r.sourceIds.includes(idB));
+                                const success = !!recipe;
+                                if (success) {
+                                    newCol[recipe.id] = (newCol[recipe.id] || 0) + 1;
+                                    setFusionResult({ id: recipe.id, success: true });
+                                    playMeld();
+                                } else {
+                                    setFusionResult({ id: 0, success: false });
+                                    playSquelch();
+                                }
+
+                                // Update History
+                                const historyEntry = {
+                                    cardAId: idA,
+                                    cardBId: idB,
+                                    resultId: recipe ? recipe.id : null,
+                                    success,
+                                    timestamp: Date.now()
+                                };
+
+                                updateState({ 
+                                    collection: newCol, 
+                                    fusionHistory: [historyEntry, ...state.fusionHistory] 
+                                });
+
+                                setIsMerging(false);
+                                setAltarSlots([null, null]);
+                            }, 1500);
+                        }}
+                    >
+                        {isMerging ? 'TRANSMUTING...' : 'INITIATE RITUAL'}
+                    </button>
+
+                    {/* Result Announcement */}
+                    {fusionResult && (
+                        <div style={{ marginTop: 30, textAlign: 'center', animation: 'floatUpFade 1s' }}>
+                            {fusionResult.success ? (
+                                <div className="success-glow" style={{ padding: 20, border: '4px solid gold', background: 'rgba(0,0,0,0.8)' }}>
+                                    <h3 style={{ color: 'gold' }}>SUCCESS!</h3>
+                                    <p>A new form has manifested.</p>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{ALL_CARDS.find(c => c.id === fusionResult.id)?.name}</div>
+                                </div>
+                            ) : (
+                                <div style={{ color: '#ff4444', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                    THE RITUAL FAILED. <br/>
+                                    THE INGREDIENTS HAVE RETURNED TO THE VOID.
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Discovery Parchment Toggle */}
+                    <button className="btn" style={{ marginTop: 60, borderColor: '#d2b48c', color: '#d2b48c' }} onClick={() => setShowParchment(!showParchment)}>
+                        {showParchment ? 'CLOSE DISCOVERY LOG' : '📜 UNROLL DISCOVERY LOG'}
+                    </button>
+
+                    {showParchment && (
+                        <div className="parchment-wrapper parchment-reveal">
+                            <div className="parchment-content">
+                                <h3 style={{ borderBottom: '2px solid #4a3728', paddingBottom: 10, marginBottom: 20 }}>ALCHEMICAL DISCOVERIES</h3>
+                                
+                                <div style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
+                                    <button className="btn" style={{ fontSize: '0.8rem', background: parchmentFilter === 'all' ? '#4a3728' : 'transparent', color: parchmentFilter === 'all' ? '#f4e4bc' : '#4a3728', borderColor: '#4a3728' }} onClick={() => setParchmentFilter('all')}>ALL</button>
+                                    <button className="btn" style={{ fontSize: '0.8rem', background: parchmentFilter === 'success' ? '#2d5a27' : 'transparent', color: parchmentFilter === 'success' ? '#f4e4bc' : '#2d5a27', borderColor: '#2d5a27' }} onClick={() => setParchmentFilter('success')}>PROFOUND</button>
+                                    <button className="btn" style={{ fontSize: '0.8rem', background: parchmentFilter === 'failure' ? '#8b0000' : 'transparent', color: parchmentFilter === 'failure' ? '#f4e4bc' : '#8b0000', borderColor: '#8b0000' }} onClick={() => setParchmentFilter('failure')}>VOID</button>
+                                </div>
+
+                                {state.fusionHistory.length === 0 ? (
+                                    <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No attempts recorded yet...</p>
+                                ) : (
+                                    state.fusionHistory
+                                        .filter(h => parchmentFilter === 'all' || (parchmentFilter === 'success' && h.success) || (parchmentFilter === 'failure' && !h.success))
+                                        .map((h, i) => {
+                                            const cardA = ALL_CARDS.find(c => c.id === h.cardAId);
+                                            const cardB = ALL_CARDS.find(c => c.id === h.cardBId);
+                                            const result = h.resultId ? ALL_CARDS.find(c => c.id === h.resultId) : null;
+                                            return (
+                                                <div key={i} className={`parchment-entry ${h.success ? 'success' : 'failure'}`}>
+                                                    <span>{cardA?.name} + {cardB?.name}</span>
+                                                    <span>➔ {h.success ? result?.name : 'VOID'}</span>
+                                                </div>
+                                            );
+                                        })
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Card Picker Roster Overlay */}
+                    {showRoster !== null && (
+                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 11000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowRoster(null)}>
+                            <div className="hylics-panel" style={{ width: '90%', maxWidth: 600, maxHeight: '80vh', padding: 20, overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                                <h3 style={{ marginBottom: 20, textAlign: 'center' }}>SELECT ESSENCE</h3>
+                                <div className="binder-grid">
+                                    {CARDS_DB.map(card => {
+                                        const owned = state.collection[card.id] || 0;
+                                        const isAlreadySelected = altarSlots.includes(card.id);
+                                        if (owned === 0) return null;
+                                        
+                                        return (
+                                            <div key={card.id} 
+                                                 className="hylics-panel binder-card" 
+                                                 style={{ width: 120, height: 180, padding: 5, opacity: isAlreadySelected ? 0.3 : 1, cursor: isAlreadySelected ? 'default' : 'pointer', position: 'relative' }}
+                                                 onClick={() => { if (!isAlreadySelected) { setAltarSlots(s => { const n = [...s]; n[showRoster] = card.id; return n; }); setShowRoster(null); } }}
+                                            >
+                                                <div style={{ position: 'absolute', top: 5, left: 5, background: 'black', fontSize: '0.7rem', padding: '2px 5px', border: '1px solid white', zIndex: 5 }}>x{owned}</div>
+                                                <img src={card.image} style={{ width: '100%', height: 100, objectFit: 'cover' }} />
+                                                <div style={{ fontSize: '0.8rem', textAlign: 'center', marginTop: 5 }}>{card.name}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <button className="btn" style={{ width: '100%', marginTop: 20 }} onClick={() => setShowRoster(null)}>CANCEL</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -716,5 +829,5 @@ const upgradeSectionHeader: React.CSSProperties = { color: 'var(--text-highlight
 const packCardStyle: React.CSSProperties = { width: 340, maxWidth: '100%', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.15s ease' };
 const devMenuStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999, width: 220, cursor: 'grab', touchAction: 'none' };
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 };
-const inspectorPanelStyle: React.CSSProperties = { width: '90%', maxWidth: 900, padding: 20, position: 'relative', overflowY: 'auto', maxHeight: '95vh' };
+const inspectorPanelStyle: React.CSSProperties = { width: '90%', maxWidth: 900, padding: 20, position: 'relative', overflow: 'hidden', maxHeight: '95vh' };
 const cardsGridStyle: React.CSSProperties = { display: 'flex', gap: 15, flexWrap: 'wrap', justifyContent: 'center' };
