@@ -6,18 +6,16 @@ import { playSquelch, playBGM, playMeld, playTypeKey, playRebirth } from './audi
 import './index.css';
 
 // SVG components reused
-const SvgEye = ({ size = 40, color = "currentColor" }) => (<svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 50 C30 20, 70 20, 90 50 C70 80, 30 80, 10 50 Z" /><circle cx="50" cy="50" r="15" fill={color} /><path d="M50 10 L50 0 M80 20 L85 10 M20 20 L15 10 M80 80 L85 90 M20 80 L15 90 M50 90 L50 100" strokeWidth="4" /></svg>);
-const SvgFleshHand = ({ size = 40, color = "currentColor" }) => (<svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"><path d="M40 90 L40 50 L20 30 L30 20 L50 40 L50 20 L60 20 L60 40 L70 10 L80 20 L65 55 L65 90 Z" /><path d="M30 80 Q20 70 20 60" strokeWidth="3" /><path d="M70 80 Q80 70 80 60" strokeWidth="3" /></svg>);
-const SvgCoffeeCup = ({ size = 40, color = "currentColor" }) => (<svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"><path d="M25 40 L25 75 C25 95 75 95 75 75 L75 40 Z" /><path d="M75 50 C95 50 95 75 75 65" /><path d="M35 25 Q45 10 50 25 T65 15" strokeWidth="4" /><circle cx="50" cy="65" r="4" fill={color} /></svg>);
-const SvgMindScraper = ({ size = 150, color = "currentColor" }) => (<svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20 Q50 0 80 20 Q100 50 80 80 Q50 100 20 80 Q0 50 20 20 Z" /><path d="M30 30 L70 70 M70 30 L30 70 M50 20 L50 80 M20 50 L80 50" strokeWidth="2" /><circle cx="50" cy="50" r="10" fill={color} /></svg>);
-const SvgGloomHand = ({ size = 150, color = "currentColor" }) => (<svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"><path d="M25 90 C10 60, 20 30, 40 20 C60 10, 80 30, 85 50 C90 70, 70 90, 50 90 Z" /><path d="M40 35 C30 40, 30 50, 40 55 C50 60, 60 50, 60 45 C60 40, 50 30, 40 35 Z" fill={color} /><circle cx="45" cy="45" r="3" fill="var(--bg-color)" /><path d="M20 90 Q30 80 25 70" strokeWidth="3" /><path d="M80 90 Q70 80 75 70" strokeWidth="3" /></svg>);
+const TransmutationIcon = ({ size = 40 }) => (<img src="/assets/transmutation.png" alt="Transmutation" style={{ width: size, height: size, objectFit: 'contain' }} />);
+const HelpingHandIcon = ({ size = 40 }) => (<img src="/assets/helpinghand.png" alt="Helping Hand" style={{ width: size, height: size, objectFit: 'contain' }} />);
+const PermaCaffIcon = ({ size = 40 }) => (<img src="/assets/permacaff.png" alt="Perma-Caff" style={{ width: size, height: size, objectFit: 'contain' }} />);
 
-// Flesh Hand Orbit — hands arranged in a circle around the coin, facing inward
+// Helping Hand Orbit — hands arranged in a circle around the coin, facing inward
 const ORBIT_RADIUS = 148;
 const ORBIT_CONTAINER = 380;
 const MAX_FINGERS = 15; // hard cap on purchasable fingers
 
-const FleshHandOrbit = ({ count, tick }: { count: number; tick: number }) => {
+const HelpingHandOrbit = ({ count, tick }: { count: number; tick: number }) => {
   const cx = ORBIT_CONTAINER / 2;
   const cy = ORBIT_CONTAINER / 2;
 
@@ -51,7 +49,7 @@ const FleshHandOrbit = ({ count, tick }: { count: number; tick: number }) => {
                 height: '100%',
               }}
             >
-              <SvgFleshHand size={28} color="var(--accent-primary)" />
+              <HelpingHandIcon size={28} />
             </div>
           </div>
         );
@@ -361,13 +359,13 @@ function App() {
                             <div style={{ pointerEvents: 'none', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {state.clickLevel === 0 && <img src="/coins/coin_0.png" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
                                 {state.clickLevel === 1 && <img src="/coins/coin_1.jpg" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
-                                {state.clickLevel === 2 && <SvgMindScraper color={currentEvolution.color} size={180} />}
-                                {state.clickLevel === 3 && <SvgGloomHand color={currentEvolution.color} size={180} />}
+                                {state.clickLevel === 2 && <img src="/coins/coin_2.jpeg" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
+                                {state.clickLevel === 3 && <img src="/coins/coin_3.jpeg" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
                             </div>
                         </div>
 
-                        {/* Orbiting flesh hands */}
-                        <FleshHandOrbit
+                        {/* Orbiting helping hands */}
+                        <HelpingHandOrbit
                             count={state.fingers}
                             tick={handTick}
                         />
@@ -380,7 +378,7 @@ function App() {
                     <h2 style={{ marginTop: 20, textDecoration: 'underline', color: currentEvolution.color, textAlign: 'center' }}>{currentEvolution.name}</h2>
                     <p style={{ marginTop: 8, fontSize: '1rem', textAlign: 'center', opacity: 0.8, maxWidth: 300 }}>
                         {state.fingers > 0
-                          ? <>{state.fingers}/{MAX_FINGERS} Flesh Hand{state.fingers !== 1 ? 's' : ''} &bull; clicking every {(intervalMs / 1000).toFixed(1)}s &bull; +{currentEvolution.value * state.fingers}/click</>  
+                          ? <>{state.fingers}/{MAX_FINGERS} Helping Hand{state.fingers !== 1 ? 's' : ''} &bull; clicking every {(intervalMs / 1000).toFixed(1)}s &bull; +{currentEvolution.value * state.fingers}/click</>  
                           : <>No hands yet &mdash; buy one in Upgrades</>}
                     </p>
                 </div>
@@ -390,7 +388,9 @@ function App() {
                         <div style={upgradeSectionHeader}>ABILITIES / UPGRADES</div>
                         <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                                <SvgEye color="var(--epic)" size={32} />
+                                <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
+                                    <TransmutationIcon size={32} />
+                                </div>
                                 <div>
                                     <h4 style={{ fontSize: '1.1rem' }}>Transmutation</h4>
                                     <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Next: {nextEvolution?.name || 'Maxed'}</p>
@@ -407,9 +407,11 @@ function App() {
 
                         <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                                <SvgFleshHand color="var(--accent-primary)" size={32} />
+                                <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
+                                    <HelpingHandIcon size={32} />
+                                </div>
                                 <div>
-                                    <h4 style={{ fontSize: '1.1rem' }}>Flesh Hand</h4>
+                                    <h4 style={{ fontSize: '1.1rem' }}>Helping Hand</h4>
                                     <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Owned: {state.fingers}/{MAX_FINGERS}</p>
                                 </div>
                             </div>
@@ -420,7 +422,9 @@ function App() {
 
                         <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                                <SvgCoffeeCup color="var(--accent-secondary)" size={32} />
+                                <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
+                                    <PermaCaffIcon size={26} />
+                                </div>
                                 <div>
                                     <h4 style={{ fontSize: '1.1rem' }}>Perma-Caff</h4>
                                     <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Level: {state.speedLevel}/5</p>
@@ -473,16 +477,16 @@ function App() {
                     const filterStyle = (card as any).filter ? { filter: (card as any).filter } : {};
 
                     return (
-                        <div key={card.id} style={{ position: 'relative', width: 170, height: 260, cursor: isUnlocked ? 'pointer' : 'default' }} onClick={() => isUnlocked && setInspectedCardId(card.id)}>
+                        <div key={card.id} style={{ position: 'relative', width: 150, height: 230, cursor: isUnlocked ? 'pointer' : 'default' }} onClick={() => isUnlocked && setInspectedCardId(card.id)}>
                             {state.newCards.includes(card.id) && <div className="new-badge">NEW</div>}
                             
                             <div className={`hylics-panel binder-card ${holoClass}`} style={{ width: '100%', height: '100%', padding: 10 }}>
                                 {isUnlocked ? (
                                     <>
                                         <div style={{ position: 'absolute', top: 5, left: 5, background: 'black', padding: '2px 5px', zIndex: 5, border: '1px solid white' }}>x{ownedCount}</div>
-                                        <img src={card.image} alt={card.name} style={{ width: '100%', height: 130, objectFit: 'cover', border: '3px solid var(--hylics-border-dark)', borderRadius: 2, ...filterStyle }} />
-                                        <h4 style={{ marginTop: 10, fontSize: '1rem', textAlign: 'center', flex: 1 }}>{card.name}</h4>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-highlight)', textAlign: 'center' }}>[ ATK: {card.attack} | HP: {card.hp} ]</span>
+                                        <img src={card.image} alt={card.name} style={{ width: '100%', height: 110, objectFit: 'cover', border: '3px solid var(--hylics-border-dark)', borderRadius: 2, ...filterStyle }} />
+                                        <h4 style={{ marginTop: 10, fontSize: '0.95rem', textAlign: 'center', flex: 1 }}>{card.name}</h4>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-highlight)', textAlign: 'center' }}>[ ATK: {card.attack} | HP: {card.hp} ]</span>
                                     </>
                                 ) : (
                                     <div className="locked-overlay">
@@ -735,7 +739,7 @@ function App() {
                     </div>
 
                     <h3 style={{ textDecoration: 'underline', marginBottom: 20 }}>AVAILABLE ROSTER</h3>
-                    <div style={cardsGridStyle}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 15, width: '50%', margin: '0 auto' }}>
                         {ALL_CARDS.filter(c => state.collection[c.id] > 0).map(card => {
                             // Can't assign if already assigned or if we assign > owned quantity (simplified: just standard owned check)
                             const assignedCount = battleSlots.filter(id => id === card.id).length;
@@ -743,7 +747,8 @@ function App() {
                             const filterStyle = (card as any).filter ? { filter: (card as any).filter } : {};
 
                             return (
-                                <div key={card.id} className="hylics-panel" style={{ width: 100, padding: 5, textAlign: 'center', opacity: canAssign ? 1 : 0.5 }}>
+                                <div key={card.id} className="hylics-panel" style={{ position: 'relative', width: '100%', padding: 5, textAlign: 'center', opacity: canAssign ? 1 : 0.5 }}>
+                                    <div style={{ position: 'absolute', top: 2, left: 2, background: 'black', padding: '2px 4px', zIndex: 10, border: '1px solid white', fontSize: '0.65rem' }}>x{state.collection[card.id] - assignedCount}</div>
                                     <img src={card.image} style={{ width: 80, height: 80, border: '2px solid black', marginBottom: 5, ...filterStyle }} />
                                     <div style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden' }}>{card.name}</div>
                                     <div style={{ fontSize: '0.8rem', color: 'red', margin: '5px 0' }}>ATK: {card.attack}</div>
@@ -830,4 +835,3 @@ const packCardStyle: React.CSSProperties = { width: 340, maxWidth: '100%', displ
 const devMenuStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999, width: 220, cursor: 'grab', touchAction: 'none' };
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 };
 const inspectorPanelStyle: React.CSSProperties = { width: '90%', maxWidth: 900, padding: 20, position: 'relative', overflow: 'hidden', maxHeight: '95vh' };
-const cardsGridStyle: React.CSSProperties = { display: 'flex', gap: 15, flexWrap: 'wrap', justifyContent: 'center' };

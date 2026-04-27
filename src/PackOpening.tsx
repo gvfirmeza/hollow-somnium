@@ -133,7 +133,7 @@ export const PackOpening: React.FC<PackOpeningProps> = ({ packType, onOpenComple
                 
                 {/* The Growing Crack Line */}
                 <div style={{ 
-                    position: 'absolute', top: '50%', left: 0, 
+                    position: 'absolute', top: '15%', left: 0, 
                     width: `${ripProgress}%`, height: 8,
                     background: '#000',
                     boxShadow: '0 20px 40px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5)',
@@ -143,7 +143,7 @@ export const PackOpening: React.FC<PackOpeningProps> = ({ packType, onOpenComple
                 }} />
 
                 {/* Rip Guide Arrow */}
-                <div style={{ ...tearStripBgStyle, backgroundColor: 'transparent', width: '100%', height: 100, top: '40%', left: 0, zIndex: 10 }}>
+                <div style={{ ...tearStripBgStyle, backgroundColor: 'transparent', width: '100%', height: 100, top: '5%', left: 0, zIndex: 10 }}>
                     <div 
                         style={{ ...tearHandleStyle, left: `calc(${ripProgress}% - 40px)`, opacity: ripProgress > 5 ? 0 : 1, transition: 'opacity 0.3s', zIndex: 20 }}
                         onPointerDown={handleRipDown}
@@ -168,13 +168,13 @@ export const PackOpening: React.FC<PackOpeningProps> = ({ packType, onOpenComple
                     <div className="pack-drop-half" style={{ 
                         width: 'min(320px, 90vw)', height: 'min(420px, 70vh)', 
                         backgroundImage: `url(${packType.image})`, backgroundSize: 'cover',
-                        clipPath: `polygon(0% 0%, 100% 0%, 100% 50%, 75% 49%, 50% 51%, 25% 49%, 0% 50%)`, // Top Half
+                        clipPath: `polygon(0% 0%, 100% 0%, 100% 15%, 75% 14%, 50% 16%, 25% 14%, 0% 15%)`, // Top Half (Tear strip)
                         animation: 'packDropLeft 1.2s forwards' 
                     }} />
                     <div className="pack-drop-half" style={{ 
                         width: 'min(320px, 90vw)', height: 'min(420px, 70vh)', 
                         backgroundImage: `url(${packType.image})`, backgroundSize: 'cover',
-                        clipPath: `polygon(0% 50%, 25% 49%, 50% 51%, 75% 49%, 100% 50%, 100% 100%, 0% 100%)`, // Bottom Half
+                        clipPath: `polygon(0% 15%, 25% 14%, 50% 16%, 75% 14%, 100% 15%, 100% 100%, 0% 100%)`, // Bottom Half (Main pack)
                         animation: 'packDropRight 1.2s forwards',
                         position: 'absolute'
                     }} />

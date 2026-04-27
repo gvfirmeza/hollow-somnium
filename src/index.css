@@ -388,14 +388,18 @@ body {
   flex-wrap: wrap;
   gap: 25px;
   justify-content: center;
+  align-content: center;
+  min-height: 100%;
+  margin-top: -2rem;
 }
 
 .binder-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 12px;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding: 10px;
 }
 
 @media (max-width: 600px) {

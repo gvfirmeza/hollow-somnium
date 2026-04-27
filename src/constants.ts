@@ -50,6 +50,14 @@ export const CARDS_DB = [
     id: 7, name: 'Hand-Goblet', rarity: 'Rare', image: '/cards/h7.png', attack: 45, hp: 90,
     lore: 'A severed limb offering infinite sustenance. No one dares drink the swirling crimson liquid.'
   },
+  {
+    id: 8, name: 'Needle-Grin', rarity: 'Rare', image: '/cards/h8.png', attack: 55, hp: 120,
+    lore: 'It feeds on the silence between heartbeats. The needles vibrate when it senses fear.'
+  },
+  {
+    id: 9, name: 'Door-Watcher', rarity: 'Epic', image: '/cards/h9.png', attack: 180, hp: 700,
+    lore: 'It waits at the threshold of perception. It does not enter; it only observes.'
+  },
 ];
 
 // MELDING RECIPES: Require 3 of the source base card
@@ -69,6 +77,10 @@ export const ABOMINATIONS_DB = [
   {
     id: 107, sourceId: 7, name: 'God-Goblet', rarity: 'Abomination', image: '/cards/h7.png', attack: 500, hp: 600, filter: 'contrast(150%) hue-rotate(45deg)',
     lore: 'It overflows endlessly. The liquid has solidified into psychic crystal.'
+  },
+  {
+    id: 109, sourceId: 9, name: 'Threshold Guardian', rarity: 'Abomination', image: '/cards/threshold_guardian.png', attack: 400, hp: 1500, filter: 'hue-rotate(-120deg) saturate(500%) contrast(180%) brightness(0.9)',
+    lore: 'It has consumed its alternates to become the doorway itself. It no longer just watches; it decides.'
   }
 ];
 
@@ -85,6 +97,22 @@ export const CHIMERAS_DB = [
   {
     id: 205, sourceIds: [1, 3], name: 'Moon-Torso', rarity: 'Chimera', image: '/cards/moon_torso.png', attack: 800, hp: 1200,
     lore: 'A lunar eclipse of stitched flesh. It watches from the center of the world with a single, unblinking eye.'
+  },
+  {
+    id: 206, sourceIds: [5, 6], name: 'Cerebral Bull', rarity: 'Chimera', image: '/cards/bull_brain.png', attack: 2400, hp: 8000,
+    lore: 'A massive indigo beast with an exposed, thinking mind. Its low bellows sound like thousands of whispering voices.'
+  },
+  {
+    id: 207, sourceIds: [2, 7], name: 'Ascendant Totem', rarity: 'Chimera', image: '/cards/totem_goblet.png', attack: 150, hp: 500,
+    lore: 'The unblinking gaze ascends from the sacrificial goblet. It has attained a higher state of biomass.'
+  },
+  {
+    id: 208, sourceIds: [1, 8], name: 'Lunatic Splicer', rarity: 'Chimera', image: '/cards/lunatic_splicer.png', attack: 350, hp: 600,
+    lore: 'A lunar distortion of flesh and steel. The needles sing when the moon is full.'
+  },
+  {
+    id: 209, sourceIds: [3, 9], name: 'Stitched Observer', rarity: 'Chimera', image: '/cards/stitched_observer.png', attack: 800, hp: 2500,
+    lore: 'The tattered remains of a torso, now granted the eternal vigil of the black hood. Its gaze is as hollow as its chest.'
   }
 ];
 
