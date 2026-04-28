@@ -57,6 +57,19 @@ body {
 }
 
 /* Coin click animations */
+.btn:active {
+  transform: scale(0.95);
+}
+
+.upgrade-item button:hover {
+  animation: bounce 0.3s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
 @keyframes float {
   0% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
@@ -388,14 +401,18 @@ body {
   flex-wrap: wrap;
   gap: 25px;
   justify-content: center;
+  align-content: center;
+  min-height: 100%;
+  margin-top: -2rem;
 }
 
 .binder-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 12px;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding: 10px;
 }
 
 @media (max-width: 600px) {
@@ -651,6 +668,16 @@ body {
 @keyframes gold-pulse {
   from { box-shadow: 0 0 10px #ffaa00; }
   to { box-shadow: 0 0 40px #ffff00; }
+}
+
+@keyframes flash {
+  0% { opacity: 0; }
+  50% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+.battle-hit-overlay {
+  pointer-events: none;
 }
 
 

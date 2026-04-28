@@ -10,7 +10,12 @@ type GameState = {
   newCards: number[];
   prestigeLevel: number;
   soulFragments: number;
+  unlockedColosseum: boolean;
+  colosseumSlots: number;
+  colosseumSpeedLevel: number;
+  clickPowerLevel: number;
   fusionHistory: { cardAId: number, cardBId: number, resultId: number | null, success: boolean, timestamp: number }[];
+  tutorialCompleted: boolean;
 };
 
 const DEFAULT_STATE: GameState = {
@@ -22,7 +27,12 @@ const DEFAULT_STATE: GameState = {
   newCards: [],
   prestigeLevel: 0,
   soulFragments: 0,
+  unlockedColosseum: false,
+  colosseumSlots: 1,
+  colosseumSpeedLevel: 0,
+  clickPowerLevel: 0,
   fusionHistory: [],
+  tutorialCompleted: false,
 };
 
 export function useGameState() {
@@ -60,12 +70,15 @@ export function useGameState() {
   useEffect(() => {
     if (state.fingers > 0) {
         const intervalTime = Math.max(500, 3000 - state.speedLevel * 500);
-        const coinValue = EVOLUTIONS[state.clickLevel]?.value ?? 1;
+        const clickPower = 1 + state.clickPowerLevel;
+        const milestoneBonus = EVOLUTIONS[state.clickLevel]?.value ?? 1;
+        const totalPower = clickPower * milestoneBonus;
+
         const interval = setInterval(() => {
             const multiplier = 1 + (state.soulFragments * 10);
             setState(prev => ({ 
                 ...prev, 
-                money: prev.money + Math.round(prev.fingers * coinValue * multiplier) 
+                money: prev.money + Math.round(prev.fingers * totalPower * multiplier) 
             }));
         }, intervalTime);
         return () => clearInterval(interval);
