@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameState } from './useGameState';
-import { EVOLUTIONS, PACKS, CARDS_DB, ALL_CARDS, ABOMINATIONS_DB, CHIMERAS_DB } from './constants';
+import { EVOLUTIONS, PACKS, CARDS_DB, ALL_CARDS, ABOMINATIONS_DB, CHIMERAS_DB, RARITIES, COLOSSEUM_CONFIG, CLICK_POWER_UPGRADES } from './constants';
 import { PackOpening } from './PackOpening';
-import { playSquelch, playBGM, playMeld, playTypeKey, playRebirth } from './audio';
+import { Tutorial } from './Tutorial';
+import { playSquelch, playBGM, playMeld, playTypeKey, playRebirth, setSfxMuted, setMusicMuted, getSfxMuted, getMusicMuted } from './audio';
 import './index.css';
 
 // SVG components reused
@@ -62,6 +63,7 @@ function App() {
   const { state, updateState, addMoney, deductMoney } = useGameState();
   const [activeTab, setActiveTab] = useState('clicker');
   const [activePack, setActivePack] = useState<any>(null);
+  const [infoPack, setInfoPack] = useState<any>(null);
   const [clickScale, setClickScale] = useState(1);
   const [clicks, setClicks] = useState<any[]>([]);
   const [debugUnlocked, setDebugUnlocked] = useState(false);
@@ -74,8 +76,26 @@ function App() {
   const [audioStarted, setAudioStarted] = useState(false);
 
   // Colosseum slots (IDs of cards placed in battle)
-  const [battleSlots, setBattleSlots] = useState<(number | null)[]>([null, null, null]);
+  const [battleSlots, setBattleSlots] = useState<(number | null)[]>([]);
   const [colosseumHits, setColosseumHits] = useState(0);
+  const [binderSortMode, setBinderSortMode] = useState<'rarity' | 'atk'>('rarity');
+  const [coinClickCount, setCoinClickCount] = useState(0);
+  const [sfxMuted, setSfxMutedState] = useState(() => getSfxMuted());
+  const [musicMuted, setMusicMutedState] = useState(() => getMusicMuted());
+
+  // Sync battleSlots length with state.colosseumSlots
+  useEffect(() => {
+    const targetSize = state.colosseumSlots;
+    if (battleSlots.length !== targetSize) {
+        const newSlots = [...battleSlots];
+        if (newSlots.length < targetSize) {
+            while (newSlots.length < targetSize) newSlots.push(null);
+        } else {
+            newSlots.length = targetSize;
+        }
+        setBattleSlots(newSlots);
+    }
+  }, [state.colosseumSlots, battleSlots.length]);
 
   // Shared tick for synced flesh hand animations
   const [handTick, setHandTick] = useState(0);
@@ -153,7 +173,6 @@ function App() {
   const [altarSlots, setAltarSlots] = useState<(number | null)[]>([null, null]);
   const [isMerging, setIsMerging] = useState(false);
   const [fusionResult, setFusionResult] = useState<{ id: number, success: boolean } | null>(null);
-  const [showParchment, setShowParchment] = useState(false);
   const [parchmentFilter, setParchmentFilter] = useState<'all' | 'success' | 'failure'>('all');
   const [showRoster, setShowRoster] = useState<number | null>(null); // slot index
 
@@ -171,11 +190,14 @@ function App() {
   const handleCoinClick = (e: React.PointerEvent) => {
     tryInitAudio();
     playSquelch();
-    addMoney(currentEvolution.value);
+    const clickPower = 1 + state.clickPowerLevel;
+    const val = currentEvolution.value * clickPower;
+    addMoney(val);
     setClickScale(0.9);
+    setCoinClickCount(n => n + 1);
     setTimeout(() => setClickScale(1), 100);
     
-    const newClick = { id: Date.now() + Math.random(), val: currentEvolution.value, x: e.clientX, y: e.clientY };
+    const newClick = { id: Date.now() + Math.random(), val: val, x: e.clientX, y: e.clientY };
     setClicks(prev => [...prev, newClick]);
     setTimeout(() => setClicks(prev => prev.filter(c => c.id !== newClick.id)), 800);
   };
@@ -183,10 +205,17 @@ function App() {
   const buyEvolution = () => { if (nextEvolution && state.money >= nextEvolution.cost) { deductMoney(nextEvolution.cost); updateState({ clickLevel: state.clickLevel + 1 }); } };
   const buyFinger = () => {
     if (state.fingers >= MAX_FINGERS) return;
-    const cost = 100 * Math.pow(2, state.fingers);
+    const cost = Math.floor(250 * Math.pow(2.2, state.fingers));
     if (state.money >= cost) { deductMoney(cost); updateState({ fingers: state.fingers + 1 }); }
   };
-  const buySpeed = () => { const cost = 500 * Math.pow(3, state.speedLevel); if (state.money >= cost && state.speedLevel < 5) { deductMoney(cost); updateState({ speedLevel: state.speedLevel + 1 }); } };
+  const buySpeed = () => { 
+    const cost = Math.floor(1000 * Math.pow(4, state.speedLevel)); 
+    if (state.money >= cost && state.speedLevel < 5) { deductMoney(cost); updateState({ speedLevel: state.speedLevel + 1 }); } 
+  };
+  const buyClickPower = () => {
+    const cost = Math.floor(CLICK_POWER_UPGRADES.baseCost * Math.pow(CLICK_POWER_UPGRADES.costMultiplier, state.clickPowerLevel));
+    if (state.money >= cost) { deductMoney(cost); updateState({ clickPowerLevel: state.clickPowerLevel + 1 }); }
+  };
 
   const buyPack = (pack: any) => {
     if (state.money >= pack.price) {
@@ -234,10 +263,28 @@ function App() {
           updateState({
               money: 0, clickLevel: 0, fingers: 0, speedLevel: 0,
               collection: {}, newCards: [], prestigeLevel: state.prestigeLevel + 1,
-              soulFragments: newFragments
+              soulFragments: newFragments,
+              unlockedColosseum: false, colosseumSlots: 1, colosseumSpeedLevel: 0
           });
-          setBattleSlots([null, null, null]);
+          setBattleSlots([]);
           setActiveTab('clicker');
+      }
+  };
+
+  const buyColosseumSlot = () => {
+      const nextIdx = state.colosseumSlots;
+      const cost = COLOSSEUM_CONFIG.slotCosts[nextIdx];
+      if (state.money >= cost && state.colosseumSlots < COLOSSEUM_CONFIG.maxSlots) {
+          deductMoney(cost);
+          updateState({ colosseumSlots: state.colosseumSlots + 1 });
+      }
+  };
+
+  const buyColosseumSpeed = () => {
+      const cost = COLOSSEUM_CONFIG.speedCosts[state.colosseumSpeedLevel];
+      if (state.money >= cost && state.colosseumSpeedLevel < COLOSSEUM_CONFIG.speedCosts.length) {
+          deductMoney(cost);
+          updateState({ colosseumSpeedLevel: state.colosseumSpeedLevel + 1 });
       }
   };
 
@@ -265,18 +312,21 @@ function App() {
       }
   }, [inspectedCardId]);
 
-  // Colosseum Combat Loop
+  // Colosseum Combat Loop — colosseum is always unlocked now
   useEffect(() => {
       const activeFighters = battleSlots.map(id => id ? ALL_CARDS.find(c => c.id === id) : null).filter(c => c);
       if (activeFighters.length > 0) {
           const totalAttack = activeFighters.reduce((sum, c) => sum + (c?.attack || 0), 0);
+          const speed = COLOSSEUM_CONFIG.speeds[state.colosseumSpeedLevel] || 10000;
+          
           const combatIntv = setInterval(() => {
               addMoney(totalAttack);
+              playSquelch();
               setColosseumHits(h => h + 1);
-          }, 2000);
+          }, speed);
           return () => clearInterval(combatIntv);
       }
-  }, [battleSlots, state.soulFragments]);
+  }, [battleSlots, state.soulFragments, state.colosseumSpeedLevel]);
 
   const InspectedCard = ALL_CARDS.find(c => c.id === inspectedCardId);
 
@@ -310,25 +360,47 @@ function App() {
       )}
 
       <header className="hylics-panel" style={{ marginBottom: 20 }}>
-        <div style={{ padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-            <h1 className="title" style={{ margin: 0, cursor: 'pointer', userSelect: 'none', textAlign: 'center' }} onDoubleClick={() => setDebugUnlocked(!debugUnlocked)}>HOLLOW·SOMNIUM</h1>
-            <div className="hylics-panel" style={{ padding: '8px 20px', fontSize: '1.4rem', fontWeight: 'bold', width: 'fit-content' }}>
-                FLESH: {state.money.toLocaleString()}
-                {state.soulFragments > 0 && <span style={{fontSize: '0.8rem', color: 'var(--accent-secondary)', display: 'block', textAlign: 'center'}}>Prestige Multiplier x{(1 + state.soulFragments * 10)}</span>}
+        <div style={{ padding: '15px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ width: 120 }} />{/* spacer */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <h1 className="title" style={{ margin: 0, cursor: 'pointer', userSelect: 'none', textAlign: 'center' }} onDoubleClick={() => setDebugUnlocked(!debugUnlocked)}>HOLLOW·SOMNIUM</h1>
+                <div className="hylics-panel" style={{ padding: '8px 20px', fontSize: '1.4rem', fontWeight: 'bold', width: 'fit-content' }}>
+                    FLESH: {state.money.toLocaleString()}
+                    {state.soulFragments > 0 && <span style={{fontSize: '0.8rem', color: 'var(--accent-secondary)', display: 'block', textAlign: 'center'}}>Prestige Multiplier x{(1 + state.soulFragments * 10)}</span>}
+                </div>
+            </div>
+            {/* Audio Controls */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                    className="btn"
+                    title={sfxMuted ? 'Unmute SFX' : 'Mute SFX'}
+                    style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: sfxMuted ? 0.45 : 1, minWidth: 42 }}
+                    onClick={() => { const next = !sfxMuted; setSfxMuted(next); setSfxMutedState(next); }}
+                >
+                    <img src={sfxMuted ? 'assets/muted1.png' : 'assets/sound1.png'} alt="SFX" style={{ height: 20, width: 'auto', filter: 'invert(1)' }} />
+                </button>
+                <button
+                    className="btn"
+                    title={musicMuted ? 'Unmute Music' : 'Mute Music'}
+                    style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: musicMuted ? 0.45 : 1, minWidth: 42 }}
+                    onClick={() => { const next = !musicMuted; setMusicMuted(next); setMusicMutedState(next); }}
+                >
+                    <img src={musicMuted ? 'assets/muted.png' : 'assets/sound.png'} alt="Music" style={{ height: 20, width: 'auto', filter: 'invert(1)' }} />
+                </button>
             </div>
         </div>
       </header>
       
       <nav className="nav-tabs">
-        <button className={`btn`} style={activeTab === 'clicker' ? activeTabStyle : {}} onClick={() => changeTab('clicker')}>HARVEST</button>
-        <button className={`btn`} style={activeTab === 'shop' ? activeTabStyle : {}} onClick={() => changeTab('shop')}>MERCHANT</button>
-        <button className={`btn`} style={activeTab === 'binder' ? activeTabStyle : {}} onClick={() => changeTab('binder')}>
+        <button id="nav-harvest" className={`btn`} style={activeTab === 'clicker' ? activeTabStyle : {}} onClick={() => changeTab('clicker')}>HARVEST</button>
+        <button id="nav-shop" className={`btn`} style={activeTab === 'shop' ? activeTabStyle : {}} onClick={() => changeTab('shop')}>MERCHANT</button>
+        <button id="nav-binder" className={`btn`} style={activeTab === 'binder' ? activeTabStyle : {}} onClick={() => changeTab('binder')}>
             INVENTORY {state.newCards.length > 0 && <span style={badgeStyle}>{state.newCards.length}</span>}
         </button>
-        <button className={`btn`} style={activeTab === 'melding' ? activeTabStyle : {}} onClick={() => changeTab('melding')}>MELDING</button>
-        <button className={`btn`} style={activeTab === 'fusions' ? activeTabStyle : {}} onClick={() => changeTab('fusions')}>FUSIONS</button>
-        <button className={`btn`} style={activeTab === 'colosseum' ? activeTabStyle : {}} onClick={() => changeTab('colosseum')}>COLOSSEUM</button>
-        <button className={`btn`} style={activeTab === 'rebirth' ? { ...activeTabStyle, border: '2px solid red', color: 'red' } : { border: '2px solid var(--accent-primary)', color: 'white' }} onClick={() => changeTab('rebirth')}>REBIRTH</button>
+        <button id="nav-melding" className={`btn`} style={activeTab === 'melding' ? activeTabStyle : {}} onClick={() => changeTab('melding')}>MELDING</button>
+        <button id="nav-fusions" className={`btn`} style={activeTab === 'fusions' ? activeTabStyle : {}} onClick={() => changeTab('fusions')}>FUSIONS</button>
+        <button id="nav-colosseum" className={`btn`} style={activeTab === 'colosseum' ? activeTabStyle : {}} onClick={() => changeTab('colosseum')}>COLOSSEUM</button>
+        <button id="nav-rebirth" className={`btn`} style={activeTab === 'rebirth' ? { ...activeTabStyle, border: '2px solid red', color: 'red' } : { border: '2px solid var(--accent-primary)', color: 'white' }} onClick={() => changeTab('rebirth')}>REBIRTH</button>
       </nav>
 
       <main className="hylics-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -352,6 +424,7 @@ function App() {
                     }}>
                         {/* The clickable coin */}
                         <div
+                            id="harvest-coin"
                             style={{ ...coinStyle, background: 'var(--bg-color)', transform: `scale(${clickScale})` }}
                             className={clickScale < 1 ? 'clicking' : ''}
                             onPointerDown={handleCoinClick}
@@ -372,13 +445,13 @@ function App() {
                     </div>
 
                     <div className="coin-inner" style={{ textShadow: '2px 2px 0 var(--hylics-border-dark)', fontSize: '3rem', zIndex: 10, textAlign: 'center', width: '100%' }}>
-                        +{currentEvolution.value}
+                        +{currentEvolution.value * (1 + state.clickPowerLevel)}
                     </div>
 
                     <h2 style={{ marginTop: 20, textDecoration: 'underline', color: currentEvolution.color, textAlign: 'center' }}>{currentEvolution.name}</h2>
                     <p style={{ marginTop: 8, fontSize: '1rem', textAlign: 'center', opacity: 0.8, maxWidth: 300 }}>
                         {state.fingers > 0
-                          ? <>{state.fingers}/{MAX_FINGERS} Helping Hand{state.fingers !== 1 ? 's' : ''} &bull; clicking every {(intervalMs / 1000).toFixed(1)}s &bull; +{currentEvolution.value * state.fingers}/click</>  
+                          ? <>{state.fingers}/{MAX_FINGERS} Helping Hand{state.fingers !== 1 ? 's' : ''} &bull; clicking every {(intervalMs / 1000).toFixed(1)}s &bull; +{(currentEvolution.value * (1 + state.clickPowerLevel)) * state.fingers} flesh/tick</>  
                           : <>No hands yet &mdash; buy one in Upgrades</>}
                     </p>
                 </div>
@@ -386,6 +459,22 @@ function App() {
                 <div className="hylics-panel upgrades-panel">
                     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div style={upgradeSectionHeader}>ABILITIES / UPGRADES</div>
+                        
+                        <div className="hylics-panel upgrade-item">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                                <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
+                                   <img src="/assets/strength.png" style={{ width: 32, height: 32, filter: 'invert(1)' }} alt="Strength" />
+                                </div>
+                                <div>
+                                    <h4 style={{ fontSize: '1.1rem' }}>Click Strength</h4>
+                                    <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Current: {1 + state.clickPowerLevel}x Power</p>
+                                </div>
+                            </div>
+                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buyClickPower} disabled={state.money < Math.floor(CLICK_POWER_UPGRADES.baseCost * Math.pow(CLICK_POWER_UPGRADES.costMultiplier, state.clickPowerLevel))}>
+                                {Math.floor(CLICK_POWER_UPGRADES.baseCost * Math.pow(CLICK_POWER_UPGRADES.costMultiplier, state.clickPowerLevel)).toLocaleString()}
+                            </button>
+                        </div>
+
                         <div className="hylics-panel upgrade-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                                 <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
@@ -415,8 +504,8 @@ function App() {
                                     <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Owned: {state.fingers}/{MAX_FINGERS}</p>
                                 </div>
                             </div>
-                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buyFinger} disabled={state.money < 100 * Math.pow(2, state.fingers) || state.fingers >= MAX_FINGERS}>
-                                {state.fingers >= MAX_FINGERS ? 'MAXED' : (100 * Math.pow(2, state.fingers)).toLocaleString()}
+                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buyFinger} disabled={state.money < Math.floor(250 * Math.pow(2.2, state.fingers)) || state.fingers >= MAX_FINGERS}>
+                                {state.fingers >= MAX_FINGERS ? 'MAXED' : Math.floor(250 * Math.pow(2.2, state.fingers)).toLocaleString()}
                             </button>
                         </div>
 
@@ -430,8 +519,8 @@ function App() {
                                     <p style={{ fontSize: '0.9rem', color: '#aaa' }}>Level: {state.speedLevel}/5</p>
                                 </div>
                             </div>
-                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buySpeed} disabled={state.speedLevel >= 5 || state.money < 500 * Math.pow(3, state.speedLevel)}>
-                                {state.speedLevel < 5 ? (500 * Math.pow(3, state.speedLevel)).toLocaleString() : 'Maxed'}
+                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '1rem' }} onClick={buySpeed} disabled={state.speedLevel >= 5 || state.money < Math.floor(1000 * Math.pow(4, state.speedLevel))}>
+                                {state.speedLevel < 5 ? Math.floor(1000 * Math.pow(4, state.speedLevel)).toLocaleString() : 'Maxed'}
                             </button>
                         </div>
                     </div>
@@ -442,7 +531,20 @@ function App() {
             {activeTab === 'shop' && (
             <div className="shop-grid">
                 {PACKS.map(pack => (
-                    <div key={pack.id} className="pack-card" data-affordable={state.money >= pack.price ? "true" : "false"} style={packCardStyle} onClick={() => buyPack(pack)} title={state.money < pack.price ? 'Not enough Flesh' : `Buy ${pack.name}`}>
+                    <div key={pack.id} className="pack-card" data-affordable={state.money >= pack.price ? "true" : "false"} style={{ ...packCardStyle, position: 'relative' }} onClick={() => buyPack(pack)} title={state.money < pack.price ? 'Not enough Flesh' : `Buy ${pack.name}`}>
+                        <div 
+                            className="pack-info-trigger" 
+                            onClick={(e) => { e.stopPropagation(); setInfoPack(pack); }}
+                            style={{
+                                position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: '50%',
+                                background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid rgba(255,255,255,0.5)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.8rem', fontWeight: 'bold', cursor: 'help', zIndex: 20, 
+                                backdropFilter: 'blur(2px)', transition: 'background 0.2s'
+                            }}
+                        >
+                            ?
+                        </div>
                         <img
                             src={pack.image}
                             alt={pack.name}
@@ -466,8 +568,37 @@ function App() {
             )}
 
             {activeTab === 'binder' && (
-            <div className="binder-grid">
-                {ALL_CARDS.map(card => {
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 30, gap: 15 }}>
+                    <div style={{ color: '#666', borderBottom: '1px solid #333', paddingBottom: 5, fontSize: '0.9rem', letterSpacing: 2 }}>SORTING BY</div>
+                    <button 
+                        className={`btn ${binderSortMode === 'rarity' ? 'btn-primary' : ''}`} 
+                        style={{ padding: '5px 20px', fontSize: '0.85rem' }} 
+                        onClick={() => setBinderSortMode('rarity')}
+                    >
+                        RARITY
+                    </button>
+                    <button 
+                        className={`btn ${binderSortMode === 'atk' ? 'btn-primary' : ''}`} 
+                        style={{ padding: '5px 20px', fontSize: '0.85rem' }} 
+                        onClick={() => setBinderSortMode('atk')}
+                    >
+                        ATTACK
+                    </button>
+                </div>
+                
+                <div className="binder-grid">
+                    {[...ALL_CARDS].sort((a, b) => {
+                        if (binderSortMode === 'rarity') {
+                            const order = ['Common', 'Rare', 'Epic', 'Legendary', 'Abomination', 'Chimera'];
+                            const diff = order.indexOf(a.rarity) - order.indexOf(b.rarity);
+                            if (diff !== 0) return diff;
+                        } else {
+                            const diff = b.attack - a.attack; // Higher attack first
+                            if (diff !== 0) return diff;
+                        }
+                        return a.id - b.id;
+                    }).map(card => {
                     const ownedCount = state.collection[card.id] || 0;
                     const isUnlocked = ownedCount > 0;
                     const isHolo = isUnlocked && (card.rarity === 'Legendary' || card.rarity === 'Epic' || card.rarity === 'Abomination');
@@ -486,7 +617,7 @@ function App() {
                                         <div style={{ position: 'absolute', top: 5, left: 5, background: 'black', padding: '2px 5px', zIndex: 5, border: '1px solid white' }}>x{ownedCount}</div>
                                         <img src={card.image} alt={card.name} style={{ width: '100%', height: 110, objectFit: 'cover', border: '3px solid var(--hylics-border-dark)', borderRadius: 2, ...filterStyle }} />
                                         <h4 style={{ marginTop: 10, fontSize: '0.95rem', textAlign: 'center', flex: 1 }}>{card.name}</h4>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-highlight)', textAlign: 'center' }}>[ ATK: {card.attack} | HP: {card.hp} ]</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-highlight)', textAlign: 'center' }}>[ ATK: {card.attack} ]</span>
                                     </>
                                 ) : (
                                     <div className="locked-overlay">
@@ -495,8 +626,9 @@ function App() {
                                 )}
                             </div>
                         </div>
-                    )
+                    );
                 })}
+                </div>
             </div>
             )}
 
@@ -533,143 +665,129 @@ function App() {
                 </div>
             )}
 
-             {activeTab === 'fusions' && (
-                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <h2 style={{ marginBottom: 10, color: 'var(--text-highlight)' }}>ALCHEMICAL ALTAR</h2>
-                    <p style={{ marginBottom: 30, color: '#aaa', textAlign: 'center', maxWidth: 500 }}>
-                        Combine two distinct essences. <br/>
-                        <span style={{ color: '#ff4444', fontWeight: 'bold' }}>WARNING: Ingredients are consumed regardless of the ritual's success.</span>
-                    </p>
+                         {activeTab === 'fusions' && (
+                <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', width: '100%' }}>
 
-                    {/* Altar Slots */}
-                    <div style={{ display: 'flex', gap: 30, marginBottom: 40, perspective: '1000px' }}>
-                        {altarSlots.map((slotId, idx) => {
-                            const card = slotId ? ALL_CARDS.find(c => c.id === slotId) : null;
-                            return (
-                                <div key={idx} 
-                                     className={`hylics-panel altar-slot ${isMerging ? 'ritual-shaking' : ''} ${slotId ? 'active' : ''}`}
-                                     onClick={() => !isMerging && setShowRoster(idx)}
-                                >
-                                    {card ? (
-                                        <div style={{ position: 'relative', width: '100%', height: '100%', padding: 5 }}>
-                                            <img src={card.image} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isMerging ? 0.6 : 1 }} />
-                                            <div style={{ position: 'absolute', bottom: 5, left: 0, right: 0, background: 'rgba(0,0,0,0.8)', fontSize: '0.7rem', padding: '2px 0', textAlign: 'center' }}>{card.name}</div>
-                                            {!isMerging && <div style={{ position: 'absolute', top: -10, right: -10, background: 'red', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid white' }} onClick={(e) => { e.stopPropagation(); setAltarSlots(s => { const n = [...s]; n[idx] = null; return n; }); }}>X</div>}
-                                        </div>
-                                    ) : (
-                                        <div style={{ fontSize: '3rem', opacity: 0.3 }}>+</div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {/* ── LEFT: ALTAR ── */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <h2 style={{ marginBottom: 10 }}>ALCHEMICAL ALTAR</h2>
+                        <p style={{ marginBottom: 30, color: '#aaa', textAlign: 'center', maxWidth: 500 }}>
+                            Combine two distinct essences. <br/>
+                            <span style={{ color: '#ff4444', fontWeight: 'bold' }}>WARNING: Ingredients are consumed regardless of the ritual's success.</span>
+                        </p>
 
-                    <button 
-                        className={`btn btn-primary ${isMerging ? 'ritual-vortex' : ''}`} 
-                        style={{ fontSize: '1.5rem', padding: '15px 40px', background: isMerging ? 'var(--accent-primary)' : 'black' }}
-                        disabled={altarSlots.some(s => s === null) || isMerging}
-                        onClick={async () => {
-                            setIsMerging(true);
-                            setFusionResult(null);
-                            
-                            // 1.5s Ritual Animation
-                            setTimeout(() => {
-                                const [idA, idB] = altarSlots;
-                                if (idA === null || idB === null) return;
-
-                                // Deduct cards
-                                const newCol = { ...state.collection };
-                                newCol[idA] = Math.max(0, newCol[idA] - 1);
-                                newCol[idB] = Math.max(0, newCol[idB] - 1);
-
-                                // Check recipe
-                                const recipe = CHIMERAS_DB.find(r => r.sourceIds.includes(idA) && r.sourceIds.includes(idB));
-                                const success = !!recipe;
-                                if (success) {
-                                    newCol[recipe.id] = (newCol[recipe.id] || 0) + 1;
-                                    setFusionResult({ id: recipe.id, success: true });
-                                    playMeld();
-                                } else {
-                                    setFusionResult({ id: 0, success: false });
-                                    playSquelch();
-                                }
-
-                                // Update History
-                                const historyEntry = {
-                                    cardAId: idA,
-                                    cardBId: idB,
-                                    resultId: recipe ? recipe.id : null,
-                                    success,
-                                    timestamp: Date.now()
-                                };
-
-                                updateState({ 
-                                    collection: newCol, 
-                                    fusionHistory: [historyEntry, ...state.fusionHistory] 
-                                });
-
-                                setIsMerging(false);
-                                setAltarSlots([null, null]);
-                            }, 1500);
-                        }}
-                    >
-                        {isMerging ? 'TRANSMUTING...' : 'INITIATE RITUAL'}
-                    </button>
-
-                    {/* Result Announcement */}
-                    {fusionResult && (
-                        <div style={{ marginTop: 30, textAlign: 'center', animation: 'floatUpFade 1s' }}>
-                            {fusionResult.success ? (
-                                <div className="success-glow" style={{ padding: 20, border: '4px solid gold', background: 'rgba(0,0,0,0.8)' }}>
-                                    <h3 style={{ color: 'gold' }}>SUCCESS!</h3>
-                                    <p>A new form has manifested.</p>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{ALL_CARDS.find(c => c.id === fusionResult.id)?.name}</div>
-                                </div>
-                            ) : (
-                                <div style={{ color: '#ff4444', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                    THE RITUAL FAILED. <br/>
-                                    THE INGREDIENTS HAVE RETURNED TO THE VOID.
-                                </div>
-                            )}
+                        {/* Altar Slots */}
+                        <div style={{ display: 'flex', gap: 30, marginBottom: 40, perspective: '1000px' }}>
+                            {altarSlots.map((slotId, idx) => {
+                                const card = slotId ? ALL_CARDS.find(c => c.id === slotId) : null;
+                                return (
+                                    <div key={idx}
+                                         className={`hylics-panel altar-slot ${isMerging ? 'ritual-shaking' : ''} ${slotId ? 'active' : ''}`}
+                                         onClick={() => !isMerging && setShowRoster(idx)}
+                                    >
+                                        {card ? (
+                                            <div style={{ position: 'relative', width: '100%', height: '100%', padding: 5 }}>
+                                                <img src={card.image} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isMerging ? 0.6 : 1 }} />
+                                                <div style={{ position: 'absolute', bottom: 5, left: 0, right: 0, background: 'rgba(0,0,0,0.8)', fontSize: '0.7rem', padding: '2px 0', textAlign: 'center' }}>{card.name}</div>
+                                                {!isMerging && <div style={{ position: 'absolute', top: -10, right: -10, background: 'red', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid white' }} onClick={(e) => { e.stopPropagation(); setAltarSlots(s => { const n = [...s]; n[idx] = null; return n; }); }}>X</div>}
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontSize: '3rem', opacity: 0.3 }}>+</div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
-                    )}
 
-                    {/* Discovery Parchment Toggle */}
-                    <button className="btn" style={{ marginTop: 60, borderColor: '#d2b48c', color: '#d2b48c' }} onClick={() => setShowParchment(!showParchment)}>
-                        {showParchment ? 'CLOSE DISCOVERY LOG' : '📜 UNROLL DISCOVERY LOG'}
-                    </button>
+                        <button
+                            className={`btn btn-primary ${isMerging ? 'ritual-vortex' : ''}`}
+                            style={{ fontSize: '1.5rem', padding: '15px 40px', background: isMerging ? 'var(--accent-primary)' : 'black' }}
+                            disabled={altarSlots.some(s => s === null) || isMerging}
+                            onClick={async () => {
+                                setIsMerging(true);
+                                setFusionResult(null);
+                                setTimeout(() => {
+                                    const [idA, idB] = altarSlots;
+                                    if (idA === null || idB === null) return;
+                                    const newCol = { ...state.collection };
+                                    newCol[idA] = Math.max(0, newCol[idA] - 1);
+                                    newCol[idB] = Math.max(0, newCol[idB] - 1);
+                                    const recipe = CHIMERAS_DB.find(r => r.sourceIds.includes(idA) && r.sourceIds.includes(idB));
+                                    const success = !!recipe;
+                                    if (success) {
+                                        newCol[recipe.id] = (newCol[recipe.id] || 0) + 1;
+                                        setFusionResult({ id: recipe.id, success: true });
+                                        playMeld();
+                                    } else {
+                                        setFusionResult({ id: 0, success: false });
+                                        playSquelch();
+                                    }
+                                    updateState({
+                                        collection: newCol,
+                                        fusionHistory: [{ cardAId: idA, cardBId: idB, resultId: recipe ? recipe.id : null, success, timestamp: Date.now() }, ...state.fusionHistory]
+                                    });
+                                    setIsMerging(false);
+                                    setAltarSlots([null, null]);
+                                }, 1500);
+                            }}
+                        >
+                            {isMerging ? 'TRANSMUTING...' : 'INITIATE RITUAL'}
+                        </button>
 
-                    {showParchment && (
-                        <div className="parchment-wrapper parchment-reveal">
-                            <div className="parchment-content">
-                                <h3 style={{ borderBottom: '2px solid #4a3728', paddingBottom: 10, marginBottom: 20 }}>ALCHEMICAL DISCOVERIES</h3>
-                                
-                                <div style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
-                                    <button className="btn" style={{ fontSize: '0.8rem', background: parchmentFilter === 'all' ? '#4a3728' : 'transparent', color: parchmentFilter === 'all' ? '#f4e4bc' : '#4a3728', borderColor: '#4a3728' }} onClick={() => setParchmentFilter('all')}>ALL</button>
-                                    <button className="btn" style={{ fontSize: '0.8rem', background: parchmentFilter === 'success' ? '#2d5a27' : 'transparent', color: parchmentFilter === 'success' ? '#f4e4bc' : '#2d5a27', borderColor: '#2d5a27' }} onClick={() => setParchmentFilter('success')}>PROFOUND</button>
-                                    <button className="btn" style={{ fontSize: '0.8rem', background: parchmentFilter === 'failure' ? '#8b0000' : 'transparent', color: parchmentFilter === 'failure' ? '#f4e4bc' : '#8b0000', borderColor: '#8b0000' }} onClick={() => setParchmentFilter('failure')}>VOID</button>
-                                </div>
-
-                                {state.fusionHistory.length === 0 ? (
-                                    <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No attempts recorded yet...</p>
+                        {/* Result */}
+                        {fusionResult && (
+                            <div style={{ marginTop: 30, textAlign: 'center', animation: 'floatUpFade 1s' }}>
+                                {fusionResult.success ? (
+                                    <div className="success-glow" style={{ padding: 20, border: '4px solid gold', background: 'rgba(0,0,0,0.8)' }}>
+                                        <h3 style={{ color: 'gold' }}>SUCCESS!</h3>
+                                        <p>A new form has manifested.</p>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{ALL_CARDS.find(c => c.id === fusionResult.id)?.name}</div>
+                                    </div>
                                 ) : (
-                                    state.fusionHistory
-                                        .filter(h => parchmentFilter === 'all' || (parchmentFilter === 'success' && h.success) || (parchmentFilter === 'failure' && !h.success))
-                                        .map((h, i) => {
-                                            const cardA = ALL_CARDS.find(c => c.id === h.cardAId);
-                                            const cardB = ALL_CARDS.find(c => c.id === h.cardBId);
-                                            const result = h.resultId ? ALL_CARDS.find(c => c.id === h.resultId) : null;
-                                            return (
-                                                <div key={i} className={`parchment-entry ${h.success ? 'success' : 'failure'}`}>
-                                                    <span>{cardA?.name} + {cardB?.name}</span>
-                                                    <span>➔ {h.success ? result?.name : 'VOID'}</span>
-                                                </div>
-                                            );
-                                        })
+                                    <div style={{ color: '#ff4444', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                        THE RITUAL FAILED. <br/>
+                                        THE INGREDIENTS HAVE RETURNED TO THE VOID.
+                                    </div>
                                 )}
                             </div>
+                        )}
+                    </div>
+
+                    {/* ── RIGHT: DISCOVERY LOG ── */}
+                    <div className="hylics-panel" style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', maxHeight: '75vh', border: '2px solid var(--hylics-border-white)' }}>
+                        <div style={{ padding: '12px 14px', borderBottom: '2px solid var(--hylics-border-white)' }}>
+                            <div style={{ fontSize: '0.8rem', letterSpacing: 3, color: 'var(--text-highlight)', fontWeight: 'bold', marginBottom: 10 }}>ALCHEMICAL DISCOVERIES</div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                {(['all', 'success', 'failure'] as const).map(f => (
+                                    <button key={f} className="btn" style={{ fontSize: '0.65rem', flex: 1, padding: '3px 0', background: parchmentFilter === f ? 'var(--hylics-border-dark)' : 'transparent', borderColor: parchmentFilter === f ? 'var(--hylics-border-white)' : 'var(--hylics-border-dark)' }} onClick={() => setParchmentFilter(f)}>
+                                        {f === 'all' ? 'ALL' : f === 'success' ? '✓ SUCCESS' : '✗ VOID'}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    )}
+                        <div style={{ overflowY: 'auto', flex: 1, padding: '10px 12px', scrollbarWidth: 'thin' }}>
+                            {state.fusionHistory.length === 0 ? (
+                                <div style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.85rem', marginTop: 16, textAlign: 'center' }}>No attempts yet...</div>
+                            ) : (
+                                state.fusionHistory
+                                    .filter(h => parchmentFilter === 'all' || (parchmentFilter === 'success' && h.success) || (parchmentFilter === 'failure' && !h.success))
+                                    .map((h, i) => {
+                                        const cardA = ALL_CARDS.find(c => c.id === h.cardAId);
+                                        const cardB = ALL_CARDS.find(c => c.id === h.cardBId);
+                                        const result = h.resultId ? ALL_CARDS.find(c => c.id === h.resultId) : null;
+                                        return (
+                                            <div key={i} style={{ padding: '7px 8px', marginBottom: 5, border: `1px solid ${h.success ? 'rgba(100,200,100,0.3)' : 'rgba(200,50,50,0.3)'}`, background: h.success ? 'rgba(100,200,100,0.05)' : 'rgba(200,50,50,0.05)', fontSize: '0.75rem' }}>
+                                                <div style={{ color: h.success ? 'rgba(150,255,150,0.8)' : 'rgba(255,100,100,0.8)', fontWeight: 'bold', marginBottom: 2 }}>
+                                                    {h.success ? '✓ PROFOUND' : '✗ VOID'}
+                                                </div>
+                                                <div style={{ color: 'var(--text-main)', opacity: 0.8 }}>{cardA?.name} + {cardB?.name}</div>
+                                                {h.success && result && <div style={{ color: 'var(--text-highlight)', marginTop: 2 }}>➔ {result.name}</div>}
+                                            </div>
+                                        );
+                                    })
+                            )}
+                        </div>
+                    </div>
 
                     {/* Card Picker Roster Overlay */}
                     {showRoster !== null && (
@@ -681,10 +799,9 @@ function App() {
                                         const owned = state.collection[card.id] || 0;
                                         const isAlreadySelected = altarSlots.includes(card.id);
                                         if (owned === 0) return null;
-                                        
                                         return (
-                                            <div key={card.id} 
-                                                 className="hylics-panel binder-card" 
+                                            <div key={card.id}
+                                                 className="hylics-panel binder-card"
                                                  style={{ width: 120, height: 180, padding: 5, opacity: isAlreadySelected ? 0.3 : 1, cursor: isAlreadySelected ? 'default' : 'pointer', position: 'relative' }}
                                                  onClick={() => { if (!isAlreadySelected) { setAltarSlots(s => { const n = [...s]; n[showRoster] = card.id; return n; }); setShowRoster(null); } }}
                                             >
@@ -703,67 +820,143 @@ function App() {
             )}
 
             {activeTab === 'colosseum' && (
-                <div style={{ textAlign: 'center' }}>
-                    <h2 style={{ marginBottom: 20 }}>MIND COLOSSEUM</h2>
-                    <p style={{ marginBottom: 40, color: '#aaa' }}>Assign creatures to harvest flesh continuously. (Attacks trigger every 2 seconds)</p>
+                <div style={{ textAlign: 'center', width: '100%' }}>
+                    <h2 style={{ marginBottom: 30, letterSpacing: '2px' }}>MIND COLOSSEUM</h2>
                     
-                    <div className="battle-slots-container">
-                        {battleSlots.map((slotId, idx) => {
-                            const slotCard = slotId ? ALL_CARDS.find(c => c.id === slotId) : null;
-                            const filterStyle = slotCard && (slotCard as any).filter ? { filter: (slotCard as any).filter } : {};
-                            
-                            return (
-                                <div key={idx} className="hylics-panel battle-slot">
-                                    <div style={{ marginBottom: 10, color: 'var(--text-highlight)' }}>SLOT {idx + 1}</div>
-                                    {slotCard ? (
-                                        <>
-                                            <div style={{ position: 'relative', width: 100, height: 100 }}>
-                                                <img src={slotCard.image} style={{ width: 100, height: 100, border: '4px solid black', display: 'block', ...filterStyle }} />
-                                                {colosseumHits > 0 && <div key={colosseumHits} className="battle-hit-overlay" />}
+                    {/* Always show the colosseum content — no lock gate */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 40, width: '100%' }}>
+                            {/* TOP AREA: SLOTS CENTERED SYMMETRICALLY */}
+                            <div style={{ display: 'flex', width: '100%', gap: 0, justifyContent: 'center' }}>
+                                {/* LEFT SPACER - MIRRORS SIDEBAR WIDTH FOR CENTERED SLOTS */}
+                                <div style={{ width: 380, flexShrink: 0 }} />
+
+                                {/* BATTLE AREA - PERFECTLY CENTERED */}
+                                <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                                    <div className="battle-slots-container" style={{ display: 'flex', gap: 20, justifyContent: 'center', width: '100%' }}>
+                                        {battleSlots.map((slotId, idx) => {
+                                            const actualCard = ALL_CARDS.find(c => c.id === slotId);
+                                            const filterStyle = actualCard && (actualCard as any).filter ? { filter: (actualCard as any).filter } : {};
+                                            
+                                            return (
+                                                <div key={idx} className="hylics-panel battle-slot" style={{ 
+                                                    width: 150, 
+                                                    minHeight: 230, 
+                                                    padding: 12, 
+                                                    display: 'flex', 
+                                                    flexDirection: 'column', 
+                                                    alignItems: 'center',
+                                                    borderStyle: actualCard ? 'solid' : 'dashed',
+                                                    borderColor: actualCard ? 'var(--hylics-border-white)' : 'rgba(255,255,255,0.2)'
+                                                }}>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-highlight)', marginBottom: 8, opacity: 0.6 }}>SLOT {idx + 1}</div>
+                                                    {actualCard ? (
+                                                        <>
+                                                            <div style={{ position: 'relative', width: 100, height: 100 }}>
+                                                                <img src={actualCard.image} style={{ width: '100%', height: '100%', border: '4px solid black', display: 'block', ...filterStyle }} />
+                                                                {colosseumHits > 0 && <div key={colosseumHits} className="battle-hit-overlay" style={{ position: 'absolute', inset: 0, backgroundColor: 'white', opacity: 0, animation: 'flash 0.1s linear' }} />}
+                                                            </div>
+                                                            <h5 style={{ margin: '10px 0 5px', fontSize: '0.9rem', lineHeight: 1.1 }}>{actualCard.name}</h5>
+                                                            <div style={{ color: 'red', fontSize: '0.85rem', fontWeight: 'bold' }}>ATK: {actualCard.attack}</div>
+                                                            <div style={{ color: 'var(--text-highlight)', fontSize: '0.65rem', margin: '4px 0' }}>+{(actualCard.attack).toLocaleString()} / cycle</div>
+                                                            <button className="btn" style={{ marginTop: 'auto', width: '100%', fontSize: '0.75rem', padding: '4px 0' }} onClick={() => {
+                                                                const newSlots = [...battleSlots];
+                                                                newSlots[idx] = null;
+                                                                setBattleSlots(newSlots);
+                                                            }}>RELEASE</button>
+                                                        </>
+                                                    ) : (
+                                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.1)', fontSize: '2rem', fontWeight: 'bold' }}>+</div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* SIDEBAR UPGRADES - RIGHT ALIGNED */}
+                                <div className="hylics-panel" style={{ width: 380, padding: 15, display: 'flex', flexDirection: 'column', gap: 15, textAlign: 'left', flexShrink: 0 }}>
+                                    <div style={{ borderBottom: '1px solid var(--text-highlight)', paddingBottom: 8, color: 'var(--text-highlight)', fontWeight: 'bold', fontSize: '0.9rem', letterSpacing: '1px' }}>ARENA STATUS</div>
+                                    
+                                    <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: 4 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: '0.9rem' }}>
+                                            <span>Active Slots:</span>
+                                            <span style={{ color: 'var(--text-highlight)', fontWeight: 'bold' }}>{state.colosseumSlots} / {COLOSSEUM_CONFIG.maxSlots}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                                            <span>Harvest Cycle:</span>
+                                            <span style={{ color: 'var(--text-highlight)', fontWeight: 'bold' }}>{(COLOSSEUM_CONFIG.speeds[state.colosseumSpeedLevel] / 1000).toFixed(1)}s</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        <div className="hylics-panel upgrade-item" style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <div style={{ fontSize: '1.2rem', opacity: 0.8 }}>⊞</div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Expand Arena</div>
+                                                    <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>+1 slot</div>
+                                                </div>
                                             </div>
-                                            <h4 style={{ margin: '10px 0' }}>{slotCard.name}</h4>
-                                            <p style={{ color: 'red' }}>ATK: {slotCard.attack}</p>
-                                            <p style={{ color: 'var(--text-highlight)', fontSize: '0.9rem' }}>+{slotCard.attack} flesh/2s</p>
-                                            <button className="btn" style={{ marginTop: 'auto', width: '100%', fontSize: '0.8rem' }} onClick={() => {
-                                                const newSlots = [...battleSlots];
-                                                newSlots[idx] = null;
-                                                setBattleSlots(newSlots);
-                                            }}>UNASSIGN</button>
-                                        </>
-                                    ) : (
-                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', color: '#555' }}>EMPTY</div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
+                                            <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem', minWidth: 70 }} onClick={buyColosseumSlot} disabled={state.colosseumSlots >= COLOSSEUM_CONFIG.maxSlots || state.money < COLOSSEUM_CONFIG.slotCosts[state.colosseumSlots]}>
+                                                {state.colosseumSlots >= COLOSSEUM_CONFIG.maxSlots ? 'MAX' : COLOSSEUM_CONFIG.slotCosts[state.colosseumSlots].toLocaleString()}
+                                            </button>
+                                        </div>
 
-                    <h3 style={{ textDecoration: 'underline', marginBottom: 20 }}>AVAILABLE ROSTER</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 15, width: '50%', margin: '0 auto' }}>
-                        {ALL_CARDS.filter(c => state.collection[c.id] > 0).map(card => {
-                            // Can't assign if already assigned or if we assign > owned quantity (simplified: just standard owned check)
-                            const assignedCount = battleSlots.filter(id => id === card.id).length;
-                            const canAssign = state.collection[card.id] > assignedCount;
-                            const filterStyle = (card as any).filter ? { filter: (card as any).filter } : {};
-
-                            return (
-                                <div key={card.id} className="hylics-panel" style={{ position: 'relative', width: '100%', padding: 5, textAlign: 'center', opacity: canAssign ? 1 : 0.5 }}>
-                                    <div style={{ position: 'absolute', top: 2, left: 2, background: 'black', padding: '2px 4px', zIndex: 10, border: '1px solid white', fontSize: '0.65rem' }}>x{state.collection[card.id] - assignedCount}</div>
-                                    <img src={card.image} style={{ width: 80, height: 80, border: '2px solid black', marginBottom: 5, ...filterStyle }} />
-                                    <div style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden' }}>{card.name}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'red', margin: '5px 0' }}>ATK: {card.attack}</div>
-                                    <button className="btn btn-primary" style={{ width: '100%', padding: '2px' }} disabled={!canAssign || !battleSlots.includes(null)} onClick={() => {
-                                        const emptyIdx = battleSlots.indexOf(null);
-                                        if (emptyIdx !== -1) {
-                                            const newSlots = [...battleSlots];
-                                            newSlots[emptyIdx] = card.id;
-                                            setBattleSlots(newSlots);
-                                        }
-                                    }}>+</button>
+                                        <div className="hylics-panel upgrade-item" style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <div style={{ fontSize: '1.2rem', opacity: 0.8 }}>⚡</div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Focus Mind</div>
+                                                    <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>Faster cycle</div>
+                                                </div>
+                                            </div>
+                                            <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem', minWidth: 70 }} onClick={buyColosseumSpeed} disabled={state.colosseumSpeedLevel >= COLOSSEUM_CONFIG.speedCosts.length || state.money < COLOSSEUM_CONFIG.speedCosts[state.colosseumSpeedLevel]}>
+                                                {state.colosseumSpeedLevel >= COLOSSEUM_CONFIG.speedCosts.length ? 'MAX' : COLOSSEUM_CONFIG.speedCosts[state.colosseumSpeedLevel].toLocaleString()}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            )
-                        })}
-                    </div>
+                            </div>
+
+                            {/* ROSTER - PERFECTLY CENTERED */}
+                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 20 }}>
+                                <h3 style={{ textDecoration: 'underline', marginBottom: 35, fontSize: '1.3rem', letterSpacing: '1px' }}>AVAILABLE ROSTER</h3>
+                                <div style={{ width: '80%', display: 'flex', flexWrap: 'wrap', gap: 20, justifyContent: 'center' }}>
+                                    {ALL_CARDS.filter(c => state.collection[c.id] > 0).map(card => {
+                                        const assignedCount = battleSlots.filter(id => id === card.id).length;
+                                        const canAssign = state.collection[card.id] > assignedCount;
+                                        const filterStyle = (card as any).filter ? { filter: (card as any).filter } : {};
+            
+                                        return (
+                                            <div key={card.id} style={{ 
+                                                position: 'relative', 
+                                                width: 150, 
+                                                height: 270, /* Slightly taller to accommodate the button */
+                                                opacity: canAssign ? 1 : 0.4,
+                                                filter: canAssign ? 'none' : 'grayscale(1)',
+                                                transition: 'all 0.3s'
+                                            }}>
+                                                <div className="hylics-panel" style={{ width: '100%', height: '100%', padding: 10, display: 'flex', flexDirection: 'column' }}>
+                                                    <div style={{ position: 'absolute', top: 5, left: 5, background: 'black', padding: '2px 5px', zIndex: 10, border: '1px solid white', fontSize: '0.75rem' }}>x{state.collection[card.id] - assignedCount}</div>
+                                                    <img src={card.image} alt={card.name} style={{ width: '100%', height: 110, objectFit: 'cover', border: '3px solid var(--hylics-border-dark)', borderRadius: 2, ...filterStyle }} />
+                                                    <h4 style={{ marginTop: 10, fontSize: '0.95rem', textAlign: 'center', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</h4>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-highlight)', textAlign: 'center', marginBottom: 10 }}>[ ATK: {card.attack} ]</span>
+                                                    
+                                                    <button className="btn btn-primary" style={{ width: '100%', padding: '5px', fontSize: '0.8rem' }} disabled={!canAssign || !battleSlots.includes(null)} onClick={() => {
+                                                        const emptyIdx = battleSlots.indexOf(null);
+                                                        if (emptyIdx !== -1) {
+                                                            const newSlots = [...battleSlots];
+                                                            newSlots[emptyIdx] = card.id;
+                                                            setBattleSlots(newSlots);
+                                                        }
+                                                    }}>ASSIGN</button>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
                 </div>
             )}
 
@@ -786,10 +979,38 @@ function App() {
         </div>
       </main>
 
+      {infoPack && (
+          <div style={modalOverlayStyle} onClick={() => setInfoPack(null)}>
+              <div className="hylics-panel" style={{ ...inspectorPanelStyle, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+                  <button className="close-btn" style={{ position: 'absolute', top: 0, right: 0, background: 'red', color: 'white', border: '2px solid black', width: 30, height: 30, fontWeight: 'bold', cursor: 'pointer', zIndex: 100 }} onClick={() => setInfoPack(null)}>X</button>
+                  <h2 style={{ color: 'var(--text-highlight)', textDecoration: 'underline', marginBottom: 25, textAlign: 'center' }}>{infoPack.name} MANIFEST</h2>
+                  
+                  <div style={{ background: 'rgba(0,0,0,0.5)', padding: 20, border: '2px solid var(--hylics-border-white)', marginBottom: 20 }}>
+                      <h3 style={{ marginBottom: 15, fontSize: '1rem', opacity: 0.8 }}>RARITY PROBABILITIES:</h3>
+                      {Object.entries(infoPack.chances as Record<string, number>).map(([rarity, chance]) => (
+                          <div key={rarity} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '1.1rem' }}>
+                              <span style={{ color: (RARITIES as any)[rarity.toUpperCase()]?.color || 'white' }}>{rarity}</span>
+                              <span style={{ color: 'var(--text-highlight)', fontWeight: 'bold' }}>{chance as React.ReactNode}%</span>
+                          </div>
+                      ))}
+                  </div>
+
+                  <h3 style={{ marginBottom: 10, fontSize: '1rem', opacity: 0.8 }}>POTENTIAL ANOMALIES:</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {CARDS_DB.filter(c => (infoPack.chances as any)[c.rarity] > 0).map(c => (
+                          <div key={c.id} style={{ background: 'rgba(255,255,255,0.05)', padding: '5px 12px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '0.9rem' }}>
+                              {c.name}
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
       {inspectedCardId && InspectedCard && (
           <div style={modalOverlayStyle} onClick={() => setInspectedCardId(null)}>
               <div className="hylics-panel" style={inspectorPanelStyle} onClick={e => e.stopPropagation()}>
-                  <button className="btn btn-primary" style={{ position: 'absolute', top: -5, right: -5, zIndex: 10, background: 'red' }} onClick={() => setInspectedCardId(null)}>X</button>
+                  <button className="close-btn" style={{ position: 'absolute', top: 0, right: 0, background: 'red', color: 'white', border: '2px solid black', width: 30, height: 30, fontWeight: 'bold', cursor: 'pointer', zIndex: 100 }} onClick={() => setInspectedCardId(null)}>X</button>
                   <div className="inspector-content">
                       {/* 3D card with mouse-follow transform */}
                       <div className="card-3d-wrapper" onMouseMove={handle3DMove} onMouseLeave={resetCardRotate}>
@@ -799,7 +1020,7 @@ function App() {
                       </div>
                       <div style={{ flex: 1, minWidth: 250, display: 'flex', flexDirection: 'column' }}>
                           <h2 style={{ fontSize: '2.5rem', marginBottom: 10, color: 'var(--text-highlight)' }}>{InspectedCard.name}</h2>
-                          <div style={{ fontSize: '1.2rem', color: '#ff5555', marginBottom: 10 }}>[ ATK: {InspectedCard.attack} | HP: {InspectedCard.hp} ]</div>
+                          <div style={{ fontSize: '1.2rem', color: '#ff5555', marginBottom: 10 }}>[ ATK: {InspectedCard.attack} ]</div>
                           <div style={{ fontSize: '1rem', color: '#aaa', marginBottom: 20 }}>Rarity: {InspectedCard.rarity} &bull; Owned: {state.collection[InspectedCard.id] || 0}x</div>
                           <p style={{ fontSize: '1.2rem', lineHeight: 1.6, background: 'rgba(0,0,0,0.5)', padding: 20, border: '2px solid var(--hylics-border-white)', fontStyle: 'italic' }}>
                               {loreText}<span style={{ opacity: 0.5, animation: 'floatUpFade 1s infinite' }}>|</span>
@@ -819,6 +1040,17 @@ function App() {
               +{c.val}
           </div>
       ))}
+
+      {/* ── TUTORIAL ── */}
+      {!state.tutorialCompleted && (
+        <Tutorial
+          activeTab={activeTab}
+          coinClickCount={coinClickCount}
+          onComplete={() => updateState({ tutorialCompleted: true })}
+          onSkip={() => updateState({ tutorialCompleted: true })}
+          onReward={() => addMoney(150)}
+        />
+      )}
     </div>
   );
 }

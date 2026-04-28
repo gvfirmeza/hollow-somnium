@@ -34,9 +34,26 @@ export const PackOpening: React.FC<PackOpeningProps> = ({ packType, onOpenComple
   const generateCards = () => {
     const newCards = [];
     for (let i = 0; i < 5; i++) {
-        const pool = CARDS_DB.filter(c => packType.pulls.some((r: any) => r.name === c.rarity));
+        const roll = Math.random() * 100;
+        let selectedRarity = 'Common';
+        
+        let cumulative = 0;
+        const chances = packType.chances || { Common: 100, Rare: 0, Epic: 0, Legendary: 0 };
+        
+        // Distribution check
+        if (roll < (cumulative += chances.Common)) {
+            selectedRarity = 'Common';
+        } else if (roll < (cumulative += chances.Rare)) {
+            selectedRarity = 'Rare';
+        } else if (roll < (cumulative += chances.Epic)) {
+            selectedRarity = 'Epic';
+        } else {
+            selectedRarity = 'Legendary';
+        }
+
+        const pool = CARDS_DB.filter(c => c.rarity === selectedRarity);
         const randomIndex = Math.floor(Math.random() * pool.length);
-        const card = pool[randomIndex] || CARDS_DB[0];
+        const card = pool[randomIndex] || CARDS_DB[0]; // Fallback to first card if pool is empty
         newCards.push({ ...card, uniqueInstanceId: Math.random() });
     }
     

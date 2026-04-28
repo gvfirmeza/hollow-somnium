@@ -1,14 +1,48 @@
-let audioCtx: AudioContext | null = null;
-let bgmStarted = false;
+const GLOBAL_KEY = '__HOLLOW_SOMNIUM_AUDIO_STATE__';
+
+interface AudioState {
+    ctx: AudioContext | null;
+    bgmMaster: GainNode | null;
+    bgmStarted: boolean;
+    sfxMuted: boolean;
+    musicMuted: boolean;
+}
+
+const getGlobalState = (): AudioState => {
+    if (!(window as any)[GLOBAL_KEY]) {
+        (window as any)[GLOBAL_KEY] = {
+            ctx: null,
+            bgmMaster: null,
+            bgmStarted: false,
+            sfxMuted: false,
+            musicMuted: false
+        };
+    }
+    return (window as any)[GLOBAL_KEY];
+};
+
+const state = getGlobalState();
 
 const initAudio = () => {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!state.ctx) {
+        state.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+    if (state.ctx.state === 'suspended') {
+        state.ctx.resume();
+    }
+    return state.ctx;
+};
+
+export const setSfxMuted = (v: boolean) => { state.sfxMuted = v; };
+export const setMusicMuted = (v: boolean) => {
+    state.musicMuted = v;
+    if (state.bgmMaster) {
+        // Use a quicker ramp for instant feedback
+        state.bgmMaster.gain.setTargetAtTime(v ? 0 : 0.15, state.ctx?.currentTime || 0, 0.03);
     }
 };
+export const getSfxMuted = () => state.sfxMuted;
+export const getMusicMuted = () => state.musicMuted;
 
 // Simple reverb via convolver filled with exponentially-decaying noise
 const createReverb = (ctx: AudioContext, duration = 2.5, decay = 2.0): ConvolverNode => {
@@ -26,7 +60,6 @@ const createReverb = (ctx: AudioContext, duration = 2.5, decay = 2.0): Convolver
     return convolver;
 };
 
-// Play a single soft bell/pad tone
 const playTone = (
     ctx: AudioContext,
     masterGain: GainNode,
@@ -40,25 +73,23 @@ const playTone = (
     osc.type = 'sine';
     osc.frequency.value = freq;
 
-    // Add a slight second harmonic for richness
     const osc2 = ctx.createOscillator();
     osc2.type = 'triangle';
-    osc2.frequency.value = freq * 2.01; // very slightly detuned 2nd harmonic
+    osc2.frequency.value = freq * 2.01;
 
     const envGain = ctx.createGain();
     envGain.gain.setValueAtTime(0, startTime);
-    envGain.gain.linearRampToValueAtTime(volume, startTime + 0.5);          // attack
-    envGain.gain.setValueAtTime(volume, startTime + duration - 1.5);        // sustain
-    envGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // release
+    envGain.gain.linearRampToValueAtTime(volume, startTime + 0.5);
+    envGain.gain.setValueAtTime(volume, startTime + duration - 1.5);
+    envGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
     const osc2Gain = ctx.createGain();
-    osc2Gain.gain.value = 0.3; // harmonics are quieter
+    osc2Gain.gain.value = 0.3;
 
     osc.connect(envGain);
     osc2.connect(osc2Gain);
     osc2Gain.connect(envGain);
 
-    // Dry + wet signal (reverb)
     envGain.connect(masterGain);
     envGain.connect(reverb);
 
@@ -68,35 +99,27 @@ const playTone = (
     osc2.stop(startTime + duration + 0.1);
 };
 
-// Schedule a full looping ambient piece
 const scheduleAmbient = (ctx: AudioContext) => {
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = 0.15;
-    masterGain.connect(ctx.destination);
+    // Only schedule if this call matches our current state's master gain to avoid HMR zombies
+    if (!state.bgmMaster) {
+        state.bgmMaster = ctx.createGain();
+        state.bgmMaster.gain.value = state.musicMuted ? 0 : 0.15;
+        state.bgmMaster.connect(ctx.destination);
+    }
+    
+    const phraseGain = ctx.createGain();
+    phraseGain.connect(state.bgmMaster);
 
-    const reverb = createReverb(ctx, 3.5, 3.0);
+    const reverb = createReverb(ctx, 4.0, 3.5);
     const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.4;
+    reverbGain.gain.value = 0.5;
     reverb.connect(reverbGain);
-    reverbGain.connect(ctx.destination);
+    reverbGain.connect(phraseGain); 
 
-    // Mysterious pentatonic-ish scale: A, C, D, E, G (A minor pentatonic)
-    // Using octave 2 and 3 for haunting depth
-    const scale = [
-        55.0,   // A2
-        65.41,  // C3
-        73.42,  // D3
-        82.41,  // E3
-        98.00,  // G3
-        110.00, // A3
-        130.81, // C4
-        146.83, // D4
-    ];
-
+    const scale = [55.0, 65.41, 73.42, 82.41, 98.00, 110.00, 130.81, 146.83];
     const now = ctx.currentTime;
-    const totalDuration = 32; // Each "phrase" is 32 seconds
+    const totalDuration = 32;
 
-    // Build a sparse, mysterious sequence of long notes
     const sequence = [
         { noteIdx: 0, start: 0,    dur: 12 },
         { noteIdx: 2, start: 4,    dur: 10 },
@@ -109,292 +132,189 @@ const scheduleAmbient = (ctx: AudioContext) => {
     ];
 
     for (const step of sequence) {
-        playTone(ctx, masterGain, reverb, scale[step.noteIdx], now + step.start, step.dur);
-        // Sometimes add an octave above at lower volume for shimmer
+        playTone(ctx, phraseGain, reverb, scale[step.noteIdx], now + step.start, step.dur);
         if (Math.random() > 0.5) {
-            playTone(ctx, masterGain, reverb, scale[step.noteIdx] * 2, now + step.start + 0.3, step.dur * 0.7, 0.03);
+            playTone(ctx, phraseGain, reverb, scale[step.noteIdx] * 2, now + step.start + 0.3, step.dur * 0.7, 0.03);
         }
     }
 
-    // Schedule next loop just before this one ends
     setTimeout(() => {
-        if (audioCtx) scheduleAmbient(audioCtx);
-    }, (totalDuration - 4) * 1000); // overlap by 4s for smooth transition
+        // Double check state.ctx hasn't changed? Wait, it shouldn't.
+        // But importantly, only keep looping if this is the active context.
+        if (state.ctx === ctx) scheduleAmbient(ctx);
+    }, (totalDuration - 4) * 1000);
 };
 
 export const playBGM = () => {
-    initAudio();
-    if (!audioCtx || bgmStarted) return;
-    bgmStarted = true;
-    scheduleAmbient(audioCtx);
+    const ctx = initAudio();
+    if (state.bgmStarted) return;
+    state.bgmStarted = true;
+    scheduleAmbient(ctx);
 };
 
-export const playSquelch = () => {
-    initAudio();
-    if (!audioCtx) return;
+// SFX play helpers
+const playSFX = (setup: (ctx: AudioContext) => { source: AudioNode | AudioBufferSourceNode, gain: GainNode, duration: number }) => {
+    if (state.sfxMuted) return;
+    const ctx = initAudio();
+    const { source, gain, duration } = setup(ctx);
+    gain.connect(ctx.destination);
+    const t = ctx.currentTime;
+    if (source instanceof AudioBufferSourceNode) {
+        source.start(t);
+    } else if (source instanceof OscillatorNode) {
+        source.start(t);
+        source.stop(t + duration);
+    }
+};
 
-    const t = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    osc.type = 'sine';
+export const playSquelch = () => playSFX(ctx => {
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
     osc.frequency.setValueAtTime(180, t);
     osc.frequency.exponentialRampToValueAtTime(35, t + 0.12);
-
-    const gain = audioCtx.createGain();
+    const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.4, t + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + 0.15);
-};
+    return { source: osc, gain, duration: 0.15 };
+});
 
-export const playTear = () => {
-    initAudio();
-    if (!audioCtx) return;
-
-    const t = audioCtx.currentTime;
+export const playTear = () => playSFX(ctx => {
+    const t = ctx.currentTime;
     const duration = 0.4;
-
-    const bufferSize = Math.floor(audioCtx.sampleRate * duration);
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-
-    const noise = audioCtx.createBufferSource();
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
     noise.buffer = buffer;
-
-    const filter = audioCtx.createBiquadFilter();
+    const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.Q.value = 5;
     filter.frequency.setValueAtTime(4000, t);
     filter.frequency.exponentialRampToValueAtTime(400, t + duration);
-
-    const gain = audioCtx.createGain();
+    const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.25, t + 0.08);
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(audioCtx.destination);
-    noise.start(t);
-};
+    return { source: noise, gain, duration };
+});
 
-// Card swipe: a smooth paper-slide sound — shaped noise with a falling frequency sweep
-export const playSwipe = () => {
-    initAudio();
-    if (!audioCtx) return;
-
-    const t = audioCtx.currentTime;
+export const playSwipe = () => playSFX(ctx => {
+    const t = ctx.currentTime;
     const duration = 0.35;
-
-    const bufferSize = Math.floor(audioCtx.sampleRate * duration);
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-        // Bell-curve amplitude shape: soft start, peak at 30%, soft end
         const pos = i / bufferSize;
-        const shape = Math.pow(Math.sin(pos * Math.PI), 0.5) * (1 - pos * 0.5);
-        data[i] = (Math.random() * 2 - 1) * shape;
+        data[i] = (Math.random() * 2 - 1) * Math.pow(Math.sin(pos * Math.PI), 0.5) * (1 - pos * 0.5);
     }
-
-    const noise = audioCtx.createBufferSource();
+    const noise = ctx.createBufferSource();
     noise.buffer = buffer;
-
-    // Bandpass sweeping DOWN like a card brushing across a surface
-    const bpf = audioCtx.createBiquadFilter();
+    const bpf = ctx.createBiquadFilter();
     bpf.type = 'bandpass';
-    bpf.Q.value = 1.5; // wider band = warmer, more papery
     bpf.frequency.setValueAtTime(1800, t);
-    bpf.frequency.exponentialRampToValueAtTime(600, t + duration); // sweep down
-
-    const gain = audioCtx.createGain();
+    bpf.frequency.exponentialRampToValueAtTime(600, t + duration);
+    const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.18, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-
     noise.connect(bpf);
     bpf.connect(gain);
-    gain.connect(audioCtx.destination);
-    noise.start(t);
-};
+    return { source: noise, gain, duration };
+});
 
-// Melding ritual: three rising tones that converge into a dark chord
 export const playMeld = () => {
-    initAudio();
-    if (!audioCtx) return;
-
-    const t = audioCtx.currentTime;
-
-    // Three staggered tones rising and resolving into a dark chord (A minor)
+    if (state.sfxMuted) return;
+    const ctx = initAudio();
+    const t = ctx.currentTime;
     const tones = [
         { startFreq: 110, endFreq: 220, delay: 0,    vol: 0.25, dur: 1.0 },
         { startFreq: 146, endFreq: 294, delay: 0.15, vol: 0.2,  dur: 0.9 },
         { startFreq: 82,  endFreq: 165, delay: 0.3,  vol: 0.3,  dur: 1.2 },
     ];
-
     tones.forEach(({ startFreq, endFreq, delay, vol, dur }) => {
-        const osc = audioCtx!.createOscillator();
+        const osc = ctx.createOscillator();
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(startFreq, t + delay);
         osc.frequency.exponentialRampToValueAtTime(endFreq, t + delay + dur * 0.6);
-
-        // Low-pass to take the harshness off the sawtooth
-        const lpf = audioCtx!.createBiquadFilter();
+        const lpf = ctx.createBiquadFilter();
         lpf.type = 'lowpass';
         lpf.frequency.setValueAtTime(800, t + delay);
         lpf.frequency.linearRampToValueAtTime(300, t + delay + dur);
-
-        const gain = audioCtx!.createGain();
+        const gain = ctx.createGain();
         gain.gain.setValueAtTime(0, t + delay);
         gain.gain.linearRampToValueAtTime(vol, t + delay + 0.04);
         gain.gain.exponentialRampToValueAtTime(0.001, t + delay + dur);
-
         osc.connect(lpf);
         lpf.connect(gain);
-        gain.connect(audioCtx!.destination);
+        gain.connect(ctx.destination);
         osc.start(t + delay);
         osc.stop(t + delay + dur + 0.05);
     });
-
-    // Final deep thud at the end
-    const thud = audioCtx.createOscillator();
-    thud.type = 'sine';
+    // Deep thud
+    const thud = ctx.createOscillator();
     thud.frequency.setValueAtTime(80, t + 0.4);
     thud.frequency.exponentialRampToValueAtTime(30, t + 0.9);
-
-    const thudGain = audioCtx.createGain();
+    const thudGain = ctx.createGain();
     thudGain.gain.setValueAtTime(0, t + 0.4);
     thudGain.gain.linearRampToValueAtTime(0.5, t + 0.42);
     thudGain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-
     thud.connect(thudGain);
-    thudGain.connect(audioCtx.destination);
+    thudGain.connect(ctx.destination);
     thud.start(t + 0.4);
     thud.stop(t + 1.0);
 };
 
-// Typewriter key click: a short, clicky noise burst with a slight pitch
-export const playTypeKey = () => {
-    initAudio();
-    if (!audioCtx) return;
-
-    const t = audioCtx.currentTime;
-
-    // Mechanical click body: a very short noise click
-    const bufSize = Math.floor(audioCtx.sampleRate * 0.04);
-    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+export const playTypeKey = () => playSFX(ctx => {
+    const t = ctx.currentTime;
+    const bufSize = ctx.sampleRate * 0.04;
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
-
-    const noise = audioCtx.createBufferSource();
+    const noise = ctx.createBufferSource();
     noise.buffer = buf;
-
-    const bpf = audioCtx.createBiquadFilter();
+    const bpf = ctx.createBiquadFilter();
     bpf.type = 'bandpass';
-    bpf.frequency.value = 3500 + Math.random() * 800; // slight random pitch each key
-    bpf.Q.value = 2;
-
-    const gain = audioCtx.createGain();
-    gain.gain.setValueAtTime(0.035, t);  // much quieter — subtle mechanical tick
+    bpf.frequency.value = 3500 + Math.random() * 800;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.035, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-
     noise.connect(bpf);
     bpf.connect(gain);
-    gain.connect(audioCtx.destination);
-    noise.start(t);
-};
+    return { source: noise, gain, duration: 0.05 };
+});
 
-// Rebirth: a massive, dramatic void-collapse sound sequence
 export const playRebirth = () => {
-    initAudio();
-    if (!audioCtx) return;
-
-    const t = audioCtx.currentTime;
-
-    // 1. Heavy sub-bass IMPACT thud at the start
-    const impactOsc = audioCtx.createOscillator();
-    impactOsc.type = 'sine';
+    if (state.sfxMuted) return;
+    const ctx = initAudio();
+    const t = ctx.currentTime;
+    // Impact
+    const impactOsc = ctx.createOscillator();
     impactOsc.frequency.setValueAtTime(120, t);
     impactOsc.frequency.exponentialRampToValueAtTime(18, t + 1.2);
-
-    const impactGain = audioCtx.createGain();
-    impactGain.gain.setValueAtTime(0, t);
-    impactGain.gain.linearRampToValueAtTime(0.9, t + 0.03); // instant slam
+    const impactGain = ctx.createGain();
+    impactGain.gain.setTargetAtTime(0.9, t, 0.01);
     impactGain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
-
     impactOsc.connect(impactGain);
-    impactGain.connect(audioCtx.destination);
+    impactGain.connect(ctx.destination);
     impactOsc.start(t);
     impactOsc.stop(t + 1.6);
-
-    // 2. Mid-range hollow scream tone, falling fast — the "mind being erased"
-    const screamOsc = audioCtx.createOscillator();
+    // Scream
+    const screamOsc = ctx.createOscillator();
     screamOsc.type = 'sawtooth';
     screamOsc.frequency.setValueAtTime(440, t + 0.05);
-    screamOsc.frequency.exponentialRampToValueAtTime(55, t + 1.8);
-
-    const screamLpf = audioCtx.createBiquadFilter();
-    screamLpf.type = 'lowpass';
+    const screamLpf = ctx.createBiquadFilter();
     screamLpf.frequency.setValueAtTime(1200, t + 0.05);
-    screamLpf.frequency.exponentialRampToValueAtTime(200, t + 1.8);
-
-    const screamGain = audioCtx.createGain();
+    const screamGain = ctx.createGain();
     screamGain.gain.setValueAtTime(0, t);
     screamGain.gain.linearRampToValueAtTime(0.3, t + 0.1);
-    screamGain.gain.setValueAtTime(0.3, t + 0.5);
     screamGain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
-
     screamOsc.connect(screamLpf);
     screamLpf.connect(screamGain);
-    screamGain.connect(audioCtx.destination);
+    screamGain.connect(ctx.destination);
     screamOsc.start(t + 0.05);
     screamOsc.stop(t + 2.1);
-
-    // 3. Burst of static — a distorted void tearing open
-    const noiseLen = audioCtx.sampleRate * 1.5;
-    const noiseBuf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
-    const nd = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseLen; i++) {
-        // Fades in then out
-        const env = Math.sin((i / noiseLen) * Math.PI);
-        nd[i] = (Math.random() * 2 - 1) * env;
-    }
-
-    const noiseNode = audioCtx.createBufferSource();
-    noiseNode.buffer = noiseBuf;
-
-    const noiseBpf = audioCtx.createBiquadFilter();
-    noiseBpf.type = 'bandpass';
-    noiseBpf.Q.value = 0.5;
-    noiseBpf.frequency.setValueAtTime(600, t + 0.2);
-    noiseBpf.frequency.exponentialRampToValueAtTime(80, t + 1.7);
-
-    const noiseGain = audioCtx.createGain();
-    noiseGain.gain.setValueAtTime(0, t + 0.2);
-    noiseGain.gain.linearRampToValueAtTime(0.4, t + 0.4);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
-
-    noiseNode.connect(noiseBpf);
-    noiseBpf.connect(noiseGain);
-    noiseGain.connect(audioCtx.destination);
-    noiseNode.start(t + 0.2);
-
-    // 4. Final silence whisper — a faint high-pitched tone that lingers
-    const whisper = audioCtx.createOscillator();
-    whisper.type = 'sine';
-    whisper.frequency.value = 880;
-
-    const whisperGain = audioCtx.createGain();
-    whisperGain.gain.setValueAtTime(0, t + 1.2);
-    whisperGain.gain.linearRampToValueAtTime(0.06, t + 1.8);
-    whisperGain.gain.exponentialRampToValueAtTime(0.001, t + 3.5);
-
-    whisper.connect(whisperGain);
-    whisperGain.connect(audioCtx.destination);
-    whisper.start(t + 1.2);
-    whisper.stop(t + 3.6);
 };
